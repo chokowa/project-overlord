@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Base Defense Programmer</title>
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="https://unpkg.com/blockly/blocks_compressed.js"></script>
+    <script src="https://unpkg.com/blockly/javascript_compressed.js"></script>
+    <script src="https://unpkg.com/blockly/msg/ja.js"></script>
+    <style>
+        /* モバイルの動的ビューポート(dvh)に対応し、画面の突き抜けを防止 */
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            height: 100%; 
+            height: 100dvh; 
+            overflow: hidden; 
+            font-family: sans-serif; 
+            background-color: #000;
+        }
+        
+        #container { 
+            display: flex; 
+            flex-direction: column; 
+            height: 100%; 
+            height: 100dvh; 
+        }
+        
+        /* ゲーム画面エリア（上部50%） */
+        #game-area { 
+            flex: 1; 
+            background: #222; 
+            position: relative; 
+            min-height: 0; /* flexアイテムの縮小を許可 */
+        }
+        
+        #game-canvas { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: contain; 
+            display: block;
+        }
+
+        /* UIオーバーレイ */
+        #ui-overlay { position: absolute; top: 10px; left: 10px; color: white; pointer-events: none; }
+        .control-panel { position: absolute; top: 10px; right: 10px; display: flex; gap: 8px; }
+        button { 
+            pointer-events: auto; 
+            padding: 12px 18px; 
+            font-size: 14px; 
+            border-radius: 6px; 
+            border: none; 
+            cursor: pointer; 
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        /* Blocklyエリア（下部50%） */
+        #blockly-area { 
+            flex: 1; 
+            border-top: 2px solid #444; 
+            position: relative; 
+            min-height: 0; /* flexアイテムの縮小を許可 */
+        }
+        
+        #blockly-div { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            right: 0; 
+            bottom: 0; 
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="game-area">
+            <canvas id="game-canvas" width="800" height="600"></canvas>
+            <div id="ui-overlay">
+                <div style="display: flex; gap: 20px; font-size: 18px; font-weight: bold; text-shadow: 1px 1px 2px black;">
+                    <div id="hp-display" style="color: #ff4d4d;"></div>
+                    <div id="score-display" style="color: #ffd700;"></div>
+                </div>
+                <div id="distance-log" style="font-size: 12px; margin-top: 5px;"></div>
+                <div id="status-message" style="margin-top: 5px; font-weight: bold;"></div>
+                <div id="code-preview" style="margin-top: 5px; font-size: 11px; color: #0f0; font-family: monospace; background: rgba(0,0,0,0.7); padding: 5px; pointer-events: auto; display: none; white-space: pre-wrap; border: 1px solid #0f0;"></div>
+            </div>
+            <div class="control-panel">
+                <button id="toggle-dist-btn" style="background: #555; color: white;">距離表示</button>
+                <button id="run-btn" style="background: #4CAF50; color: white;">RUN (適用)</button>
+            </div>
+        </div>
+        <div id="blockly-area">
+            <div id="blockly-div"></div>
+        </div>
+    </div>
+
+    <xml id="toolbox" style="display: none">
+        <category name="ロジック" colour="#5b67a5">
+            <block type="controls_if"></block>
+            <block type="logic_compare"></block>
+        </category>
+        <category name="ターゲット" colour="#a55b5b">
+            <block type="get_enemies"></block>
+            <block type="select_enemy"></block>
+            <block type="set_target"></block>
+        </category>
+    </xml>
+
+    <script type="module" src="blocks.js"></script>
+    <script type="module" src="game.js"></script>
+</body>
+</html>

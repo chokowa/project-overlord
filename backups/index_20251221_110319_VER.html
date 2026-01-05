@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Castle Guardian: Gem Link - Ultimate Edition</title>
+    <style>
+        /* 天才のGridレイアウト: 画面をゲーム(1fr)とUI(300px)で厳格に分割 */
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            height: 100vh; 
+            background: #0f0f0f; 
+            color: #ecf0f1; 
+            font-family: 'Consolas', 'Courier New', monospace; 
+            overflow: hidden; 
+        }
+
+        #main-layout {
+            display: grid;
+            grid-template-rows: 1fr 300px; /* UIエリアを300pxで絶対固定 */
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #game-viewport {
+            position: relative;
+            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+            border-bottom: 3px solid #34495e;
+            overflow: hidden;
+        }
+
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* 強化されたUIエリア */
+        #ui-control-panel {
+            background: #2c3e50;
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 20px;
+            padding: 15px;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        .socket-board {
+            background: #34495e;
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid #5d6d7e;
+        }
+
+        .socket-group {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+        }
+
+        .gem-slot {
+            width: 70px;
+            height: 70px;
+            border: 4px dashed #95a5a6;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            background: rgba(0,0,0,0.2);
+        }
+
+        .gem-slot:hover { transform: scale(1.1); border-color: #ecf0f1; }
+        .gem-slot.active-type { border-style: solid; border-color: #f1c40f; box-shadow: 0 0 15px #f1c40f; }
+        .gem-slot.support-type { border-style: solid; border-color: #3498db; }
+
+        .inventory-board {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+            gap: 10px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .inv-item {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            border: 2px solid #555;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .inv-item:hover { transform: translateY(-5px); border-color: #fff; box-shadow: 0 5px 10px rgba(0,0,0,0.5); }
+
+        /* レベルアップ・モーダル (VS風) */
+        #upgrade-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .card-container { display: flex; gap: 30px; }
+        .upgrade-card {
+            width: 180px;
+            height: 260px;
+            background: linear-gradient(135deg, #2980b9, #2c3e50);
+            border: 4px solid #f1c40f;
+            border-radius: 20px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .upgrade-card:hover { transform: scale(1.05) rotate(2deg); background: #3498db; }
+
+        /* HUD */
+        #hud-container {
+            position: absolute;
+            top: 20px; left: 20px;
+            pointer-events: none;
+            width: 300px;
+        }
+        .bar-bg { background: #333; height: 12px; border-radius: 6px; margin-bottom: 8px; border: 1px solid #555; overflow: hidden; }
+        .bar-fill-hp { background: linear-gradient(90deg, #c0392b, #e74c3c); height: 100%; transition: width 0.3s; }
+        .bar-fill-xp { background: linear-gradient(90deg, #27ae60, #2ecc71); height: 100%; transition: width 0.1s; }
+    </style>
+</head>
+<body>
+    <div id="main-layout">
+        <div id="game-viewport">
+            <canvas id="game-canvas" width="1200" height="600"></canvas>
+            
+            <div id="upgrade-overlay">
+                <h1 style="color:#f1c40f; margin-bottom: 40px; text-shadow: 0 0 10px #f1c40f;">LEVEL UP: 力を選べ</h1>
+                <div class="card-container" id="upgrade-options"></div>
+            </div>
+
+            <div id="hud-container">
+                <div style="font-size: 14px; margin-bottom: 5px;">CASTLE INTEGRITY</div>
+                <div class="bar-bg"><div id="hp-bar-fill" class="bar-fill-hp" style="width: 100%;"></div></div>
+                <div style="font-size: 14px; margin-bottom: 5px;">EXPERIENCE</div>
+                <div class="bar-bg"><div id="xp-bar-fill" class="bar-fill-xp" style="width: 0%;"></div></div>
+                <div id="game-stats" style="font-size: 18px; font-weight: bold; margin-top: 10px;"></div>
+            </div>
+        </div>
+
+        <div id="ui-control-panel">
+            <div class="socket-board">
+                <h2 style="margin:0; font-size: 18px; color: #f1c40f;">GEM LINK SYSTEM</h2>
+                <div class="socket-group">
+                    <div class="gem-slot active-type" id="slot-0" data-index="0">ACTIVE</div>
+                    <div class="gem-slot support-type" id="slot-1" data-index="1">SUPPORT</div>
+                    <div class="gem-slot support-type" id="slot-2" data-index="2">SUPPORT</div>
+                </div>
+                <p style="font-size:11px; color:#bdc3c7; margin-top:15px;">クリックでお城にGEMを装着・解除できます。</p>
+            </div>
+            <div class="inventory-board">
+                <h2 style="margin:0 0 10px 0; font-size: 18px;">INVENTORY</h2>
+                <div id="inventory-grid"></div>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="game.js"></script>
+</body>
+</html>

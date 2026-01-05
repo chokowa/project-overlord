@@ -1,0 +1,236 @@
+▼▼▼ FILE START: index.html ▼▼▼
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Project OVERLORD: Defense Protocol</title>
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="https://unpkg.com/blockly/javascript_compressed.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b0c10;
+            --panel-bg: #1f2833;
+            --accent-cyan: #66fcf1;
+            --accent-purple: #c5c6c7;
+            --text-main: #c5c6c7;
+            --neon-glow: 0 0 10px rgba(102, 252, 241, 0.5);
+        }
+
+        body, html { 
+            margin: 0; padding: 0; height: 100vh; 
+            background: var(--bg-color); color: var(--text-main); 
+            font-family: 'Segoe UI', 'Roboto', sans-serif; overflow: hidden;
+            user-select: none;
+        }
+
+        #main-layout {
+            display: grid;
+            grid-template-rows: 1fr 320px; 
+            height: 100vh; width: 100vw;
+        }
+
+        /* --- Game Viewport (Top) --- */
+        #game-viewport {
+            position: relative;
+            background: radial-gradient(circle at 50% 50%, #2c3e50 0%, #000000 100%);
+            border-bottom: 3px solid #45a29e;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+
+        #game-canvas { width: 100%; height: 100%; display: block; }
+
+        /* HUD Overlay */
+        #hud-container { 
+            position: absolute; top: 20px; left: 20px; width: 300px; 
+            pointer-events: none;
+        }
+        .status-label { font-size: 10px; color: #45a29e; letter-spacing: 1px; margin-bottom: 2px; }
+        .bar-frame { 
+            background: rgba(0,0,0,0.6); height: 10px; border: 1px solid #45a29e;
+            transform: skewX(-20deg); overflow: hidden; margin-bottom: 8px;
+        }
+        .bar-fill-hp { background: #e74c3c; height: 100%; width: 100%; transition: width 0.2s; box-shadow: 0 0 8px #e74c3c; }
+        .bar-fill-xp { background: #2ecc71; height: 100%; width: 0%; transition: width 0.2s; box-shadow: 0 0 8px #2ecc71; }
+        
+        #game-stats {
+            font-family: 'Courier New', monospace; font-size: 12px; color: #fff;
+            text-shadow: 0 0 5px #45a29e; margin-top: 5px;
+        }
+        
+        #controls-hint {
+            position: absolute; top: 20px; right: 20px; text-align: right;
+            font-family: 'Courier New', monospace; font-size: 11px; color: #666;
+        }
+        .key-badge {
+            display: inline-block; padding: 2px 6px; border: 1px solid #666; border-radius: 4px; color: #aaa;
+        }
+
+        /* Level Up Overlay */
+        #upgrade-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(11, 12, 16, 0.95); z-index: 100;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+        .upgrade-card {
+            background: var(--panel-bg); border: 1px solid #45a29e; border-radius: 4px;
+            padding: 20px; width: 160px; text-align: center; cursor: pointer;
+            transition: all 0.2s; margin: 0 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        }
+        .upgrade-card:hover { 
+            transform: translateY(-5px) scale(1.05); 
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 20px var(--neon-glow);
+        }
+
+        /* --- Control Panel (Bottom) --- */
+        #ui-control-panel {
+            background: #111;
+            background-image: linear-gradient(0deg, transparent 24%, rgba(69, 162, 158, .05) 25%, rgba(69, 162, 158, .05) 26%, transparent 27%, transparent 74%, rgba(69, 162, 158, .05) 75%, rgba(69, 162, 158, .05) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(69, 162, 158, .05) 25%, rgba(69, 162, 158, .05) 26%, transparent 27%, transparent 74%, rgba(69, 162, 158, .05) 75%, rgba(69, 162, 158, .05) 76%, transparent 77%, transparent);
+            background-size: 30px 30px;
+            display: grid;
+            grid-template-columns: 360px 1fr 320px; 
+            gap: 15px; padding: 15px;
+            box-shadow: inset 0 10px 30px rgba(0,0,0,0.8);
+        }
+
+        .panel-box {
+            background: rgba(31, 40, 51, 0.8);
+            border: 1px solid #45a29e;
+            border-radius: 4px; padding: 10px;
+            display: flex; flex-direction: column;
+            position: relative;
+        }
+        .panel-title {
+            font-size: 12px; color: var(--accent-cyan); font-weight: bold;
+            margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;
+            border-bottom: 1px solid rgba(69, 162, 158, 0.3); padding-bottom: 4px;
+        }
+
+        /* Inventory Grid */
+        #inventory-grid {
+            display: grid; grid-template-columns: repeat(5, 1fr);
+            gap: 6px; overflow-y: auto; flex-grow: 1; padding-right: 5px;
+            align-content: start;
+        }
+        .inv-item { 
+            aspect-ratio: 1; border-radius: 2px; 
+            border: 1px solid rgba(255,255,255,0.1); cursor: pointer;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: bold; color: #fff;
+            text-shadow: 0 1px 2px rgba(0,0,0,1);
+            position: relative; overflow: hidden;
+            background: rgba(0,0,0,0.3);
+        }
+        .inv-item:hover { border-color: #fff; background: rgba(255,255,255,0.1); }
+
+        /* Equipment Slots */
+        .equip-section { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+        .slot-row { display: flex; gap: 8px; }
+        .gem-slot {
+            flex: 1; height: 50px;
+            border: 1px solid #45a29e; background: rgba(0,0,0,0.4);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px; color: #aaa; cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .gem-slot:hover { background: rgba(69, 162, 158, 0.2); color: #fff; }
+        .slot-label {
+            position: absolute; top: 2px; left: 4px; font-size: 8px; color: var(--accent-cyan); opacity: 0.7;
+        }
+
+        /* Blockly Area */
+        #blockly-area { 
+            position: relative; flex-grow: 1; background: #fff; 
+            border-radius: 2px; overflow: hidden; opacity: 0.95;
+        }
+        #blockly-div { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+        .btn-apply {
+            position: absolute; top: 10px; right: 10px; z-index: 50;
+            background: var(--accent-cyan); color: #000; border: none;
+            padding: 5px 15px; font-weight: bold; cursor: pointer;
+            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+            transition: transform 0.1s;
+        }
+        .btn-apply:hover { transform: scale(1.05); background: #fff; }
+        .btn-apply:active { transform: scale(0.95); }
+
+    </style>
+</head>
+<body>
+    <div id="main-layout">
+        <div id="game-viewport">
+            <canvas id="game-canvas" width="1200" height="600"></canvas>
+            
+            <div id="hud-container">
+                <div class="status-label">CASTLE INTEGRITY</div>
+                <div class="bar-frame"><div id="hp-bar-fill" class="bar-fill-hp"></div></div>
+            
+                <div class="status-label">SYS.EXPERIENCE</div>
+                <div class="bar-frame"><div id="xp-bar-fill" class="bar-fill-xp"></div></div>
+                
+                <div id="game-stats">INITIALIZING...</div>
+            </div>
+
+            <div id="controls-hint">
+                <span class="key-badge">SPACE</span> PAUSE<br>
+                <span class="key-badge">R</span> RETRY
+            </div>
+
+            <div id="upgrade-overlay">
+                <h1 style="color: var(--accent-cyan); font-family: 'Courier New'; text-transform: uppercase; margin-bottom: 20px;">System Upgrade Available</h1>
+                <div id="upgrade-options" style="display: flex;"></div>
+            </div>
+        </div>
+
+        <div id="ui-control-panel">
+            <div class="panel-box">
+                <div class="panel-title">Resource Storage</div>
+                <div id="inventory-grid"></div>
+            </div>
+
+            <div class="panel-box" style="padding: 0; border: none;">
+                <div id="blockly-area">
+                    <button class="btn-apply" onclick="applyAiLogic()">UPLOAD LOGIC</button>
+                    <div id="blockly-div"></div>
+                </div>
+            </div>
+
+            <div class="panel-box">
+                <div class="panel-title">Active Loadout</div>
+                <div class="equip-section">
+                    <div class="slot-row">
+                        <div class="gem-slot" id="slot-0" data-index="0">
+                            <span class="slot-label">MAIN</span> EMPTY
+                        </div>
+                    </div>
+                    <div class="slot-row">
+                        <div class="gem-slot" id="slot-1" data-index="1">
+                            <span class="slot-label">MOD.A</span> EMPTY
+                        </div>
+                        <div class="gem-slot" id="slot-2" data-index="2">
+                            <span class="slot-label">MOD.B</span> EMPTY
+                        </div>
+                    </div>
+                    <div class="panel-title" style="margin-top: 5px;">Artifacts</div>
+                    <div class="slot-row">
+                        <div class="gem-slot" id="slot-ring" onclick="engineState.unequipByUuid(engineState.equippedArtifacts.RING?.uuid); refreshInventoryInterface();">
+                            <span class="slot-label">RING</span> EMPTY
+                        </div>
+                        <div class="gem-slot" id="slot-amulet" onclick="engineState.unequipByUuid(engineState.equippedArtifacts.AMULET?.uuid); refreshInventoryInterface();">
+                            <span class="slot-label">AMULET</span> EMPTY
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module" src="game.js"></script>
+    <script src="blocks.js"></script>
+</body>
+</html>
+▲▲▲ FILE END: index.html ▲▲▲

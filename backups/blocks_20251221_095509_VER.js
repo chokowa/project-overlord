@@ -1,0 +1,63 @@
+/**
+ * @fileoverview Blocklyのカスタムブロック定義およびコード生成ロジック
+ */
+
+/** @type {any} */
+const javascriptGenerator = (window).Blockly.JavaScript;
+
+// 射程内の敵リスト取得ブロック
+Blockly.Blocks['get_enemies'] = {
+  init: function() {
+    this.appendDummyInput().appendField("射程内の敵リストを取得");
+    this.setOutput(true, "Array");
+    this.setColour(160);
+    this.setTooltip("現在タレットの射程内にいる敵全員をリストとして返します。");
+  }
+};
+
+javascriptGenerator.forBlock['get_enemies'] = function(block, generator) {
+  const generatedCode = 'enemyList';
+  return [generatedCode, generator.ORDER_ATOMIC];
+};
+
+// 敵の抽出ブロック（最短距離・最大HPなど）
+Blockly.Blocks['select_enemy'] = {
+  init: function() {
+    this.appendValueInput("LIST").setCheck("Array").appendField("リストから");
+    this.appendDummyInput()
+        .appendField("が")
+        .appendField(new Blockly.FieldDropdown([
+            ["最短距離", "MIN_DIST"],
+            ["最大HP", "MAX_HP"],
+            ["最小HP", "MIN_HP"]
+        ]), "CRITERIA")
+        .appendField("の敵を選択");
+    this.setOutput(true, "Enemy");
+    this.setColour(160);
+    this.setTooltip("条件に一致する敵を1体選び出します。");
+  }
+};
+
+javascriptGenerator['select_enemy'] = function(block) {
+  const listCode = javascriptGenerator.valueToCode(block, 'LIST', javascriptGenerator.ORDER_ATOMIC) || '[]';
+  const criteriaValue = block.getFieldValue('CRITERIA');
+  const code = `selectEnemyHelper(${listCode}, "${criteriaValue}")`;
+  return [code, javascriptGenerator.ORDER_FUNCTION_CALL];
+};
+
+// ターゲット設定ブロック
+Blockly.Blocks['set_target'] = {
+  init: function() {
+    this.appendValueInput("ENEMY").setCheck("Enemy").appendField("ターゲットを");
+    this.appendDummyInput().appendField("に設定する");
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour(20);
+    this.setTooltip("選んだ敵を、タレットが狙う対象として確定させます。");
+  }
+};
+
+javascriptGenerator['set_target'] = function(block) {
+  const enemyInstanceCode = javascriptGenerator.valueToCode(block, 'ENEMY', javascriptGenerator.ORDER_ATOMIC) || 'null';
+  return `this.targetEnemy = ${enemyInstanceCode};\n`;
+};

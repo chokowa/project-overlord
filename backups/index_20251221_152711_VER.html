@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Project OVERLORD: Vertical Ops</title>
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="https://unpkg.com/blockly/javascript_compressed.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b0c10;
+            --panel-bg: #1f2833;
+            --accent-cyan: #66fcf1;
+            --accent-purple: #c5c6c7;
+            --text-main: #c5c6c7;
+            --slot-border: #45a29e;
+        }
+
+        body, html { 
+            margin: 0; padding: 0; height: 100vh; 
+            background: #000; color: var(--text-main); 
+            font-family: 'Segoe UI', 'Roboto', sans-serif; overflow: hidden;
+            user-select: none;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        #device-frame {
+            position: relative;
+            width: 600px; height: 900px;
+            background: radial-gradient(circle at 50% 80%, #2c3e50 0%, #000000 100%);
+            border: 2px solid #333;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+
+        #game-canvas { width: 100%; height: 100%; display: block; }
+
+        /* HUD Overlay */
+        #hud-container { 
+            position: absolute; top: 10px; left: 10px; width: 580px; 
+            pointer-events: none; display: flex; justify-content: space-between;
+        }
+        .hud-group { display: flex; flex-direction: column; width: 180px; }
+
+        .bar-frame { 
+            background: rgba(0,0,0,0.6); height: 8px; border: 1px solid var(--slot-border);
+            transform: skewX(-20deg); overflow: hidden; margin-bottom: 4px;
+        }
+        .bar-fill-hp { background: #e74c3c; height: 100%; width: 100%; transition: width 0.2s; }
+        .bar-fill-xp { background: #2ecc71; height: 100%; width: 0%; transition: width 0.2s; }
+        
+        #game-stats {
+            position: absolute; top: 40px; width: 100%; text-align: center;
+            font-family: 'Courier New', monospace; font-size: 12px; color: #fff;
+            text-shadow: 0 0 5px var(--slot-border);
+        }
+
+        /* Footer Controls */
+        #footer-controls {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 80px;
+            background: rgba(11, 12, 16, 0.9); border-top: 1px solid var(--slot-border);
+            display: flex; justify-content: space-around; align-items: center;
+            padding-bottom: 10px; z-index: 50;
+        }
+
+        .control-btn {
+            width: 60px; height: 60px; border-radius: 12px;
+            background: #1f2833; border: 2px solid var(--slot-border);
+            color: var(--accent-cyan); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; font-size: 24px;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .control-btn:hover { background: var(--accent-cyan); color: #000; transform: translateY(-5px); }
+        .control-btn span { font-size: 10px; margin-top: 2px; }
+
+        /* Modal Overlay (Dock & Logic) */
+        .modal-overlay {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 85%;
+            background: rgba(15, 20, 25, 0.98);
+            border-top: 2px solid var(--accent-cyan);
+            border-radius: 20px 20px 0 0;
+            z-index: 100;
+            display: flex; flex-direction: column;
+            transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+            transform: translateY(0);
+        }
+        .modal-overlay.hidden { transform: translateY(110%); }
+
+        .modal-header {
+            padding: 15px; border-bottom: 1px solid #333;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-title { font-size: 16px; font-weight: bold; color: var(--accent-cyan); letter-spacing: 1px; }
+        .close-btn { 
+            background: none; border: none; color: #e74c3c; font-size: 24px; cursor: pointer; 
+        }
+
+        .modal-content {
+            padding: 15px; overflow-y: auto; flex-grow: 1;
+        }
+
+        /* Dock Layout */
+        .equipment-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 15px;
+            margin-bottom: 20px;
+        }
+        .gem-slot {
+            height: 60px; border: 1px solid var(--slot-border); background: rgba(0,0,0,0.4);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px; color: #666; cursor: pointer; border-radius: 6px;
+        }
+        .gem-slot.drag-over { background: rgba(102, 252, 241, 0.2); border-color: #fff; }
+
+        #inventory-grid {
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+            min-height: 150px;
+        }
+        .inv-item { 
+            aspect-ratio: 1; border-radius: 4px; background: rgba(0,0,0,0.3);
+            border: 1px solid #444; color: #fff; font-size: 9px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: grab;
+        }
+        
+        /* Logic Editor */
+        #blockly-div { width: 100%; height: 100%; min-height: 500px; }
+
+        /* Upgrade Overlay */
+        #upgrade-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(11, 12, 16, 0.95); z-index: 200;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .upgrade-card {
+            background: var(--panel-bg); border: 1px solid var(--slot-border);
+            padding: 20px; margin: 10px; width: 200px; text-align: center; cursor: pointer;
+        }
+        .upgrade-card:hover { transform: scale(1.05); border-color: #fff; }
+
+        /* [Patch] Skill Tree Styles */
+        .tree-node {
+            position: absolute; width: 40px; height: 40px;
+            background: #2c3e50; border: 2px solid #555; border-radius: 50%;
+            cursor: pointer; transform: translate(-50%, -50%); z-index: 10;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .tree-node:hover { border-color: var(--accent-cyan); box-shadow: 0 0 10px var(--accent-cyan); }
+        .tree-node.allocated { background: var(--accent-cyan); border-color: #fff; box-shadow: 0 0 15px var(--accent-cyan); }
+
+        .node-tooltip {
+            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.95); border: 1px solid var(--accent-cyan);
+            padding: 8px; border-radius: 4px; width: 180px; pointer-events: none;
+            display: none; z-index: 20; text-align: left;
+        }
+        .tree-node:hover .node-tooltip { display: block; }
+
+    </style>
+</head>
+<body>
+    <div id="device-frame">
+        <canvas id="game-canvas" width="600" height="900"></canvas>
+        
+        <div id="hud-container">
+            <div class="hud-group">
+                <div style="font-size:10px; color:#aaa;">INTEGRITY</div>
+                <div class="bar-frame"><div id="hp-bar-fill" class="bar-fill-hp"></div></div>
+            </div>
+            <div class="hud-group" style="align-items:flex-end;">
+                <div style="font-size:10px; color:#aaa;">SYNC RATE (XP)</div>
+                <div class="bar-frame" style="width:100%"><div id="xp-bar-fill" class="bar-fill-xp"></div></div>
+            </div>
+        </div>
+        <div id="game-stats">INITIALIZING...</div>
+
+        <div id="upgrade-overlay">
+            <h2 style="color:var(--accent-cyan);">SYSTEM UPGRADE</h2>
+            <div id="upgrade-options"></div>
+        </div>
+
+        <div id="footer-controls">
+            <div class="control-btn" onclick="toggleMenu('dock-modal')">
+                <div id="footer-active-icon" style="width:20px; height:20px; background:#333; border-radius:50%; margin-bottom:2px;"></div>
+                <span>DOCK</span>
+            </div>
+            <div class="control-btn" style="width:80px; border-color:#e74c3c;" onclick="engineState.togglePause()">
+                ⏸
+                <span>PAUSE</span>
+            </div>
+            <div class="control-btn" onclick="toggleMenu('logic-modal')">
+                🤖
+                <span>AI LOGIC</span>
+
+            </div>
+            <div class="control-btn" style="border-color:#f1c40f; color:#f1c40f;" onclick="toggleMenu('shop-modal')">
+                🛒
+                <span>SHOP</span>
+            </div>
+        </div>
+
+        <div id="dock-modal" class="modal-overlay hidden">
+            <div class="modal-header">
+                <div class="modal-title">EQUIPMENT DOCK</div>
+                <button class="close-btn" onclick="toggleMenu('dock-modal')">×</button>
+            </div>
+            <div class="modal-content">
+                <div class="equipment-grid">
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <div style="color:#aaa; font-size:10px;">WEAPON SYSTEMS</div>
+                        <div class="gem-slot" id="slot-0" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'SLOT', 0)">ACTIVE</div>
+                        <div class="gem-slot" id="slot-1" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'SLOT', 1)">MOD A</div>
+                        <div class="gem-slot" id="slot-2" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'SLOT', 2)">MOD B</div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <div style="color:#aaa; font-size:10px;">ARTIFACTS</div>
+                        <div class="gem-slot" id="slot-ring" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'SLOT', 'RING')">RING</div>
+                        <div class="gem-slot" id="slot-amulet" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'SLOT', 'AMULET')">AMULET</div>
+                    </div>
+                </div>
+
+                <div style="color:var(--accent-cyan); font-size:11px; margin-bottom:5px; border-bottom:1px solid #333;">STORAGE</div>
+                <div id="inventory-grid" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'INVENTORY')"></div>
+                
+                <div id="salvage-area" style="margin-top:20px; border:1px dashed #e74c3c; padding:15px; text-align:center; color:#e74c3c; font-size:11px;"
+                     ondragover="allowDrop(event)" ondrop="handleDrop(event, 'SALVAGE')">
+                    ⚠️ DRAG HERE TO SALVAGE
+                </div>
+            </div>
+        </div>
+
+        <div id="logic-modal" class="modal-overlay hidden">
+             <div class="modal-header">
+                <div class="modal-title">AI LOGIC CORE</div>
+                <button class="btn-apply" style="background:var(--accent-cyan); border:none; padding:5px 15px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="applyAiLogic()">APPLY</button>
+                <button class="close-btn" onclick="toggleMenu('logic-modal')">×</button>
+            </div>
+            <div class="modal-content" style="padding:0;">
+                <div id="blockly-div"></div>
+            </div>
+        </div>
+
+        <div id="skill-tree-modal" class="modal-overlay hidden">
+            <div class="modal-header">
+                <div class="modal-title">NEURAL SKILL TREE</div>
+                <button class="close-btn" onclick="toggleMenu('skill-tree-modal')">×</button>
+            </div>
+            <div class="modal-content" style="position: relative;
+overflow: auto; background: radial-gradient(circle at center, #1a1a2e 0%, #000 100%);">
+                 <div id="skill-tree-content" style="width: 800px;
+height: 600px; position: relative; margin: 0 auto;"></div>
+            </div>
+        </div>
+
+        <div id="shop-modal" class="modal-overlay hidden">
+            <div class="modal-header">
+                <div class="modal-title" style="color:#f1c40f;">BLACK MARKET</div>
+                <button class="close-btn" onclick="toggleMenu('shop-modal')">×</button>
+            </div>
+            <div class="modal-content">
+                <div style="background:#333; color:#f1c40f; padding:10px; margin-bottom:15px; text-align:right; font-weight:bold; border:1px solid #f1c40f; border-radius:4px;" id="shop-gold-display">
+                    FUNDS: 0 G
+                </div>
+                <div id="shop-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                    </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module" src="game.js"></script>
+    <script src="blocks.js"></script>
+</body>
+</html>

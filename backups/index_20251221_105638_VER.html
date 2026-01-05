@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Castle Guardian: Gem Link</title>
+    <style>
+        body { margin: 0; background: #1a1a1a; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        #container { display: flex; flex-direction: column; height: 100vh; }
+        #game-area { flex: 2; position: relative; background: #000; border-bottom: 4px solid #333; }
+        canvas { width: 100%; height: 100%; object-fit: contain; }
+        
+        /* GEM UI */
+        #ui-area { flex: 1; display: flex; padding: 20px; gap: 20px; background: #2c3e50; }
+        .gem-socket-container { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .socket-group { display: flex; gap: 10px; padding: 15px; background: #34495e; border-radius: 10px; border: 2px inset #2c3e50; }
+        .gem-slot { width: 60px; height: 60px; border: 3px dashed #7f8c8d; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; transition: 0.2s; }
+        .gem-slot.active { border-style: solid; border-color: #f1c40f; box-shadow: 0 0 10px #f1c40f; }
+        .gem-slot.support { border-style: solid; border-color: #3498db; }
+        
+        #inventory { flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; overflow-y: auto; background: #1a1a1a; padding: 10px; border-radius: 5px; }
+        .inv-item { width: 45px; height: 45px; background: #333; border: 1px solid #555; cursor: pointer; }
+
+        /* VS Style Modal */
+        #upgrade-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; }
+        .upgrade-container { display: flex; gap: 20px; }
+        .upgrade-card { width: 200px; padding: 20px; background: #2980b9; border: 3px solid #fff; border-radius: 15px; cursor: pointer; text-align: center; }
+        .upgrade-card:hover { transform: scale(1.05); background: #3498db; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="game-area">
+            <canvas id="game-canvas" width="800" height="400"></canvas>
+            <div id="upgrade-modal">
+                <div class="upgrade-container" id="upgrade-options"></div>
+            </div>
+            <div id="hud" style="position: absolute; top: 10px; left: 10px; pointer-events: none;">
+                <div id="hp-bar" style="width: 200px; height: 20px; background: #444;"><div id="hp-inner" style="width: 100%; height: 100%; background: #e74c3c;"></div></div>
+                <div id="xp-bar" style="width: 200px; height: 5px; background: #444; margin-top: 5px;"><div id="xp-inner" style="width: 0%; height: 100%; background: #2ecc71;"></div></div>
+                <div id="stats" style="margin-top: 10px; font-weight: bold; text-shadow: 1px 1px 2px #000;"></div>
+            </div>
+        </div>
+        <div id="ui-area">
+            <div class="gem-socket-container">
+                <h3 style="margin:0">装備中のスキル</h3>
+                <div class="socket-group" id="main-sockets">
+                    <div class="gem-slot active" id="slot-0" data-index="0">ACTIVE</div>
+                    <div class="gem-slot support" id="slot-1" data-index="1">SUPPORT</div>
+                    <div class="gem-slot support" id="slot-2" data-index="2">SUPPORT</div>
+                </div>
+                <p style="font-size:12px; color:#bdc3c7">※スロットをクリックで装備解除</p>
+            </div>
+            <div style="flex:1">
+                <h3 style="margin:0">インベントリ</h3>
+                <div id="inventory"></div>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="game.js"></script>
+</body>
+</html>

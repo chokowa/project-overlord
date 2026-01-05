@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Base Defense Programmer</title>
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: sans-serif; }
+        #container { display: flex; flex-direction: column; height: 100vh; }
+        
+        /* ゲーム画面（上半分） */
+        #game-area { flex: 1; background: #222; position: relative; }
+        #game-canvas { width: 100%; height: 100%; object-fit: contain; }
+
+        /* UIコントロール */
+        #ui-overlay { position: absolute; top: 10px; left: 10px; color: white; pointer-events: none; }
+        .control-panel { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
+        button { pointer-events: auto; padding: 8px 12px; font-size: 14px; }
+
+        /* Blocklyエディタ（下半分） */
+        #blockly-area { flex: 1; border-top: 2px solid #444; position: relative; }
+        #blockly-div { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="game-area">
+            <canvas id="game-canvas"></canvas>
+            <div id="ui-overlay">
+                <div id="distance-log"></div>
+            </div>
+            <div class="control-panel">
+                <button id="toggle-dist-btn">距離表示切替</button>
+                <button id="run-btn" style="background: #4CAF50; color: white;">RUN</button>
+            </div>
+        </div>
+        <div id="blockly-area">
+            <div id="blockly-div"></div>
+        </div>
+    </div>
+
+    <xml id="toolbox" style="display: none">
+        <category name="ロジック" colour="#5b67a5">
+            <block type="controls_if"></block>
+            <block type="logic_compare"></block>
+        </category>
+        <category name="ターゲット" colour="#a55b5b">
+            </category>
+    </xml>
+
+    <script type="module" src="game.js"></script>
+</body>
+</html>

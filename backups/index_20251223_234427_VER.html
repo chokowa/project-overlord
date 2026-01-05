@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Project OVERLORD: Vertical Ops</title>
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="https://unpkg.com/blockly/javascript_compressed.js"></script>
+    <style>
+        /* --- Quick Buy Buttons --- */
+        .quick-buy-container {
+            position: absolute;
+            top: 705px; /* 砲台の土台(720px)の高さに合わせる */
+            display: flex;
+            flex-direction: row; /* 水平に並べる */
+            gap: 12px;
+            z-index: 45;
+            pointer-events: none;
+        }
+        /* 砲台(中心300px)の左右に適切に配置 */
+        #quick-buy-left { right: 350px; } 
+        #quick-buy-right { left: 350px; }
+
+        .quick-btn {
+            width: 44px; height: 44px; /* サイズをコンパクトに */
+            background: rgba(11, 12, 16, 0.85);
+            border: 1px solid var(--accent-cyan);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center; justify-content: center;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: 0.2s;
+            box-shadow: 0 0 12px rgba(102, 252, 241, 0.2);
+            position: relative;
+        }
+        .quick-btn:active { transform: scale(0.9); }
+        .quick-btn.disabled {
+            filter: grayscale(1) opacity(0.4);
+            border-color: #555;
+            cursor: not-allowed;
+        }
+        .quick-btn .icon { font-size: 22px; } /* アイコンを少しだけ大きく */
+
+        :root {
+            --bg-color: #0b0c10;
+            --panel-bg: #1f2833;
+            --accent-cyan: #66fcf1;
+            --accent-gold: #f1c40f;
+            --accent-red: #e74c3c;
+            --text-main: #c5c6c7;
+            --slot-border: #45a29e;
+        }
+
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background: #000; color: var(--text-main); 
+            font-family: 'Hiragino Kaku Gothic Pro', 'Meiryo', sans-serif; 
+            overflow: hidden; user-select: none;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        #device-frame {
+            position: relative;
+            /* アスペクト比を維持 (600:900 = 2:3) */
+            aspect-ratio: 2 / 3;
+            /* 画面内に収まるように自動調整 */
+            width: auto; height: auto;
+            max-width: 100%; max-height: 100dvh;
+
+            background: radial-gradient(circle at 50% 80%, #2c3e50 0%, #000000 100%);
+            border: 2px solid #333;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+
+        #game-canvas { 
+            width: 100%; height: 100%; 
+            flex-grow: 1; display: block; 
+            /* キャンバスの描画サイズと表示サイズを一致させるための指定 */
+            object-fit: contain;
+        }
+
+        /* --- PoE Style HUD (Bottom Panel) --- */
+        #bottom-hud {
+            position: absolute; bottom: 0; left: 0; width: 100%; 
+            /* 高さ調整: 140px -> 120px */
+            height: calc(120px + env(safe-area-inset-bottom));
+            /* グラデーションを調整して上部の抜けを良くする */
+            background: linear-gradient(to top, #0b0c10 60%, transparent 100%);
+            display: flex; justify-content: space-between; align-items: flex-end;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
+            z-index: 50;
+            pointer-events: none;
+            box-sizing: border-box;
+        }
+
+        /* Vertical Meters (HP / Energy) - Mobile Optimized */
+        .orb-container {
+            width: 40px; height: 110px; /* 少し短縮: 120px -> 110px */
+            position: relative;
+            margin: 0 8px 0 8px; /* マージン微調整 */
+            pointer-events: auto;
+            border-radius: 20px;
+            background: #111;
+            border: 2px solid #555;
+            box-shadow: 0 0 15px rgba(0,0,0,0.8);
+            overflow: hidden;
+            display: flex; flex-direction: column; justify-content: flex-end;
+        }
+        .orb-fill {
+            width: 100%; 
+            /* height controlled by JS */
+            transition: height 0.2s;
+        }
+        .orb-fill.hp {
+            background: linear-gradient(to top, #c0392b, #ff6b6b);
+            box-shadow: 0 0 10px #c0392b;
+        }
+        .orb-fill.energy {
+            background: linear-gradient(to top, #2980b9, #74b9ff);
+            box-shadow: 0 0 10px #2980b9;
+        }
+        .orb-text {
+            position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+            font-size: 22px; line-height: 1; z-index: 10;
+            filter: drop-shadow(0 0 2px #000);
+            pointer-events: none;
+        }
+        .orb-label {
+            position: absolute; bottom: 8px; width: 100%; text-align: center;
+            font-size: 10px; font-weight: bold; color: #fff; 
+            text-shadow: 0 0 4px #000; z-index: 10; font-family: monospace;
+            pointer-events: none;
+        }
+
+        /* Center Panel (Controls & Stats) */
+        .center-panel {
+            flex-grow: 1; height: 100px;
+            display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+            pointer-events: auto;
+            margin-bottom: 5px;
+        }
+
+        .stats-row {
+            display: flex; gap: 15px; margin-bottom: 5px;
+            font-size: 12px; font-weight: bold;
+            text-shadow: 1px 1px 0 #000;
+        }
+        .stat-item { color: #fff; display: flex; align-items: center; gap: 4px; }
+        .stat-gold { color: #f1c40f; }
+        .stat-sp { color: #00d2d3; }
+
+        .xp-bar-container {
+            width: 90%; height: 6px; background: #333;
+            border: 1px solid #555; border-radius: 3px;
+            margin-bottom: 8px; overflow: hidden;
+        }
+        .xp-bar-fill {
+            height: 100%; background: #f1c40f; width: 0%; transition: width 0.3s;
+        }
+
+        .control-buttons {
+            display: flex; gap: 10px;
+        }
+        .hud-btn {
+            width: 40px; height: 40px; /* コンパクト化: 45px -> 40px */
+            background: #1f2833; border: 2px solid #45a29e;
+            border-radius: 8px; color: #66fcf1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 16px; transition: 0.1s;
+        }
+        .hud-btn:active { transform: scale(0.95); }
+        .hud-btn span { font-size: 8px; margin-top: 2px; }
+        .hud-btn.active { background: #66fcf1; color: #000; }
+
+        /* Wave Info (Top Center - Minimal) */
+        #top-info {
+            position: absolute; top: 10px; left: 0; width: 100%;
+            text-align: center; pointer-events: none;
+        }
+        .wave-badge {
+            display: inline-block; background: rgba(0,0,0,0.6); 
+            border: 1px solid #f1c40f; color: #f1c40f;
+            padding: 5px 15px; border-radius: 15px;
+            font-weight: bold; font-size: 14px;
+        }
+        .wave-progress {
+            width: 200px; height: 4px; background: rgba(255,255,255,0.2);
+            margin: 5px auto; border-radius: 2px; overflow: hidden;
+        }
+        .wave-progress-fill {
+            height: 100%; background: #f1c40f; width: 0%;
+        }
+
+        /* --- Modals & Overlays --- */
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 15, 20, 0.95); 
+            z-index: 6000; /* Higher than title screen (5000) */
+            display: flex; flex-direction: column;
+            transition: opacity 0.2s; opacity: 1; pointer-events: auto;
+        }
+        .modal-overlay.hidden { opacity: 0; pointer-events: none; }
+
+        .modal-header {
+            padding: 15px; border-bottom: 2px solid #45a29e;
+            display: flex; justify-content: space-between; align-items: center;
+            background: #0b0c10;
+        }
+        .modal-title { font-size: 18px; font-weight: bold; color: #66fcf1; }
+        .close-btn { background: none; border: none; color: #e74c3c; font-size: 28px; cursor: pointer; }
+
+        .modal-content { flex-grow: 1; padding: 10px; overflow-y: auto; }
+
+        /* Upgrade Selection (Vampire Survivors Style) */
+        #upgrade-selection-modal {
+            background: rgba(0, 0, 0, 0.85);
+            align-items: center; justify-content: center;
+        }
+        .upgrade-container {
+            display: flex; flex-direction: column; gap: 15px; width: 90%; max-width: 400px;
+        }
+        .upgrade-card {
+            background: linear-gradient(135deg, #2c3e50, #1a1a2e);
+            border: 2px solid #bdc3c7; border-radius: 8px;
+            padding: 15px; color: #fff; cursor: pointer;
+            display: flex; align-items: center; gap: 15px;
+            transition: transform 0.2s;
+            position: relative; overflow: hidden;
+        }
+        .upgrade-card:hover { transform: scale(1.03); border-color: #f1c40f; background: linear-gradient(135deg, #34495e, #2c3e50); }
+        .upgrade-card.rare { border-color: #f1c40f; }
+        .upgrade-icon { font-size: 32px; width: 50px; text-align: center; }
+        .upgrade-info { flex: 1; }
+        .upgrade-name { font-weight: bold; font-size: 16px; color: #f1c40f; margin-bottom: 4px; }
+        .upgrade-desc { font-size: 12px; color: #ccc; line-height: 1.3; }
+        .upgrade-btn {
+            margin-top: 10px; padding: 10px; background: #333; border: 1px solid #777; 
+            color: #fff; cursor: pointer; border-radius: 4px; text-align: center;
+        }
+
+        /* Skill Tree Container (Zoomable) */
+        #skill-tree-viewport {
+            width: 100%; height: 100%; overflow: hidden; position: relative;
+            background: radial-gradient(circle, #222 0%, #000 100%);
+            touch-action: none; /* Prevent browser default zoom */
+        }
+        #skill-tree-content {
+            transform-origin: 0 0;
+            position: absolute;
+        }
+
+        /* Skill Tree Nodes Styling */
+        .tree-node {
+            position: absolute;
+            width: 40px; height: 40px;
+            transform: translate(-50%, -50%);
+            background: #222; border: 2px solid #555; border-radius: 50%;
+            cursor: pointer; z-index: 2;
+            transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        .tree-node:hover { transform: translate(-50%, -50%) scale(1.2); border-color: #fff; z-index: 10; }
+        .tree-node.allocated { background: #f1c40f; border-color: #fff; box-shadow: 0 0 15px #f1c40f; }
+
+        .node-start { width: 60px; height: 60px; border-color: #00d2d3; background: #1a1a2e; box-shadow: 0 0 20px #00d2d3; }
+
+        .node-keystone { 
+            width: 70px; height: 70px; 
+            border-radius: 8px; border-width: 3px; border-color: #e74c3c; 
+            transform: translate(-50%, -50%) rotate(45deg); 
+        }
+        .node-keystone.allocated { background: #c0392b; border-color: #ff7675; box-shadow: 0 0 25px #e74c3c; }
+        .node-keystone:hover { transform: translate(-50%, -50%) rotate(45deg) scale(1.1); }
+        /* Fix text rotation inside keystone */
+        .node-keystone > div { transform: rotate(-45deg); } 
+
+        .node-medium { width: 50px; height: 50px; border-color: #a29bfe; border-width: 2px; }
+        .node-medium.allocated { background: #6c5ce7; }
+
+        .node-label {
+            position: absolute;
+            top: 105%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            color: #fff;
+            text-shadow: 0 0 4px #000;
+            white-space: nowrap;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 2px 6px;
+            border-radius: 4px;
+            z-index: 20;
+        }
+
+        /* --- Specific Modal Styles --- */
+        /* Equipment & Inventory UI */
+        .loadout-row { display: flex; gap: 5px; margin-bottom: 5px; align-items: center; }
+        .loadout-label { width: 40px; font-size: 10px; color: #aaa; text-align: right; margin-right: 5px; }
+        .gem-slot {
+            flex: 1; height: 50px; background: rgba(0,0,0,0.5); border: 1px solid #555;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 4px; font-size: 10px; color: #666; position: relative;
+        }
+        .acc-row { display: flex; justify-content: center; gap: 20px; margin: 15px 0; border-top: 1px solid #333; border-bottom: 1px solid #333; padding: 10px 0; }
+        .acc-slot { width: 80px; height: 80px; }
+
+        .inv-section-header { font-size: 12px; color: #f1c40f; margin-top: 10px; border-bottom: 1px solid #444; padding-bottom: 2px; }
+        #inventory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 5px; } /* Mobile friendly: 4 cols */
+
+        .inv-item {
+            aspect-ratio: 1; border: 1px solid #444; border-radius: 4px; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            font-size: 10px; background: rgba(255,255,255,0.05); position: relative;
+            cursor: pointer; overflow: hidden;
+        }
+        .inv-name { font-size: 9px; text-align: center; line-height: 1.1; margin-top: 2px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* Tap Selection Highlight */
+        .selected-item { border-color: #f1c40f !important; box-shadow: 0 0 10px #f1c40f; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+
+        /* Side Action Buttons (Pause, Swap) */
+        .side-hud-btn {
+            position: absolute; width: 44px; height: 44px;
+            background: rgba(0,0,0,0.6); border: 2px solid #fff; color: #fff;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 20px; cursor: pointer; z-index: 90; transition: 0.1s;
+            pointer-events: auto;
+        }
+        .side-hud-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.2); }
+
+        /* Action Menu for Touch */
+        #action-menu {
+            position: absolute; background: #222; border: 1px solid #66fcf1;
+            padding: 5px; border-radius: 4px; z-index: 7000;
+            display: flex; flex-direction: column; gap: 5px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .action-btn {
+            background: #333; color: #fff; border: none; padding: 8px 12px;
+            font-size: 12px; cursor: pointer; text-align: left;
+        }
+        .action-btn:hover { background: #444; }
+        .action-btn.danger { color: #e74c3c; }
+        .inv-item { 
+            aspect-ratio: 1; border: 1px solid #444; border-radius: 4px; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            font-size: 10px; background: rgba(255,255,255,0.05);
+        }
+
+        /* Shop Grid */
+        #shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        /* Title Screen */
+        #title-screen {
+            background: radial-gradient(circle at 50% 30%, #1f2833 0%, #0b0c10 80%);
+            z-index: 5000; /* High priority, but below modals */
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .title-logo {
+            color: #66fcf1; font-size: 40px; text-shadow: 0 0 20px #45a29e;
+            margin-bottom: 10px; font-weight: bold; text-align: center; line-height: 1.1;
+        }
+        .title-sub {
+            color: #c5c6c7; font-size: 16px; letter-spacing: 4px; 
+            margin-bottom: 60px; text-transform: uppercase;
+        }
+        .title-btn {
+            width: 220px; margin: 10px auto; padding: 15px;
+            background: transparent; border: 2px solid #66fcf1;
+            color: #66fcf1; font-family: monospace; font-size: 16px; font-weight: bold;
+            cursor: pointer; transition: 0.2s; position: relative; overflow: hidden;
+            text-align: center; text-decoration: none; display: block;
+        }
+        .title-btn:hover {
+            background: rgba(102, 252, 241, 0.1);
+            box-shadow: 0 0 15px rgba(102, 252, 241, 0.5);
+            letter-spacing: 2px;
+            color: #fff; border-color: #fff;
+        }
+
+        /* Guide Colors */
+        .slot-active-bg { background: rgba(231, 76, 60, 0.1); border-color: #c0392b !important; }
+        .slot-support-bg { background: rgba(46, 204, 113, 0.1); border-color: #27ae60 !important; }
+
+        /* Help Modal Text */
+        .help-section { margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .help-title { color: #f1c40f; font-weight: bold; margin-bottom: 5px; }
+        .help-desc { font-size: 12px; color: #ccc; line-height: 1.4; }
+
+        /* --- Arcade Style Cut-in Effect --- */
+        #cutin-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 8000; overflow: hidden; display: none;
+        }
+        .cutin-banner {
+            position: absolute; top: 42%; left: -110%; width: 120%; height: 60px; /* 高さ半分 */
+            background: linear-gradient(90deg, transparent, rgba(0,210,211,0.6) 15%, rgba(0,210,211,0.6) 85%, transparent); /* 透過度アップ */
+            transform: skewX(-20deg);
+            display: flex; align-items: center;
+            box-shadow: 0 0 20px rgba(0,210,211,0.3);
+            border-top: 1px solid rgba(255,255,255,0.5); border-bottom: 1px solid rgba(255,255,255,0.5);
+        }
+        .cutin-image {
+            height: 140%; margin-left: 15%; margin-top: -10px; /* サイズ調整 */
+            filter: drop-shadow(0 0 8px #000);
+            image-rendering: pixelated;
+            transform: skewX(20deg);
+            opacity: 0.8;
+        }
+        .cutin-text-group {
+            margin-left: 15px; transform: skewX(20deg); color: #fff;
+            text-shadow: 0 0 8px #000;
+        }
+        .cutin-ability-name {
+            font-size: 20px; font-weight: 900; font-style: italic; /* コンパクトに */
+            letter-spacing: 1px; text-transform: uppercase;
+        }
+        .cutin-crew-name { font-size: 10px; opacity: 0.8; font-weight: bold; }
+
+        /* Animations */
+        @keyframes cutin-sequence {
+            0% { left: -110%; opacity: 0; }
+            15% { left: -10%; opacity: 1; }
+            85% { left: 0%; opacity: 1; }
+            100% { left: 110%; opacity: 0; }
+        }
+        .animate-cutin { animation: cutin-sequence 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        /* Fuse Notification Banner */
+        #fuse-overlay {
+            position: absolute; top: 180px; left: 0; width: 100%;
+            pointer-events: none; z-index: 7000; display: none;
+        }
+        .fuse-banner {
+            background: linear-gradient(90deg, transparent, rgba(102, 252, 241, 0.2) 20%, rgba(102, 252, 241, 0.2) 80%, transparent);
+            border-top: 1px solid rgba(102, 252, 241, 0.5);
+            border-bottom: 1px solid rgba(102, 252, 241, 0.5);
+            height: 40px; display: flex; align-items: center; justify-content: center;
+            overflow: hidden; box-shadow: 0 0 20px rgba(102, 252, 241, 0.1);
+        }
+        .fuse-content { color: var(--accent-cyan); font-weight: bold; font-family: monospace; letter-spacing: 2px; font-size: 14px; text-shadow: 0 0 8px var(--accent-cyan); }
+        .fuse-level { color: var(--accent-gold); margin-left: 10px; font-size: 18px; }
+
+        @keyframes fuse-in {
+            0% { transform: scaleY(0); opacity: 0; }
+            10% { transform: scaleY(1); opacity: 1; }
+            90% { transform: scaleY(1); opacity: 1; }
+            100% { transform: scaleY(0); opacity: 0; }
+        }
+        .animate-fuse { animation: fuse-in 1.8s cubic-bezier(0.19, 1, 0.22, 1) forwards; }
+
+    </style>
+</head>
+<body>
+    <div id="device-frame">
+        <!-- Title Screen -->
+        <div id="title-screen" class="modal-overlay">
+            <div>
+                <div class="title-logo">PROJECT<br>OVERLORD</div>
+                <div class="title-sub">Vertical Ops</div>
+
+                <div class="title-btn" onclick="startGame()">MISSION START</div>
+                <div class="title-btn" onclick="toggleMenu('help-modal')">TUTORIAL / HELP</div>
+                <!-- <div class="title-btn" onclick="configManager.togglePanel()">SYSTEM CONFIG</div> -->
+            </div>
+            <div style="position:absolute; bottom:20px; width:100%; text-align:center; color:#555; font-size:10px;">
+                V3.0.0 - SYSTEM READY
+            </div>
+        </div>
+
+        <canvas id="game-canvas" width="600" height="900"></canvas>
+
+        <!-- Quick Buy Buttons (Left) -->
+        <div id="quick-buy-left" class="quick-buy-container">
+            <div class="quick-btn" id="qbtn-repair" onclick="engineState.buyShopItem('repair')">
+                <span class="icon">🔧</span>
+            </div>
+            <div class="quick-btn" id="qbtn-drone_col" onclick="engineState.buyShopItem('drone_col')">
+                <span class="icon">🧹</span>
+            </div>
+        </div>
+
+        <!-- Quick Buy Buttons (Right) -->
+        <div id="quick-buy-right" class="quick-buy-container">
+            <div class="quick-btn" id="qbtn-drone_atk" onclick="engineState.buyShopItem('drone_atk')">
+                <span class="icon">🛸</span>
+            </div>
+            <div class="quick-btn" id="qbtn-clone" onclick="engineState.buyShopItem('clone')">
+                <span class="icon">👥</span>
+            </div>
+        </div>
+
+        <!-- Artifacts HUD (Left Side) -->
+        <div id="artifact-hud" style="position:absolute; top:80px; left:10px; width:40px; display:flex; flex-direction:column; gap:5px; pointer-events:auto; z-index:40;">
+            <!-- Generated by JS -->
+        </div>
+
+        <!-- Speed Control Button (Top Right) -->
+        <div id="speed-btn" 
+             style="position:absolute; top:15px; right:15px; background:rgba(0,0,0,0.6); border:1px solid #7f8c8d; color:#fff; padding:5px 10px; border-radius:15px; font-size:12px; cursor:pointer; pointer-events:auto; z-index:100; user-select:none;"
+             onclick="window.engineState && window.engineState.toggleGameSpeed()">
+            ▶️ x1.0
+        </div>
+
+        <!-- BGM Toggle Button (Below Speed Button) -->
+        <div id="bgm-btn" 
+             style="position:absolute; top:50px; right:15px; background:rgba(0,0,0,0.6); border:1px solid #7f8c8d; color:#66fcf1; padding:5px 10px; border-radius:15px; font-size:12px; cursor:pointer; pointer-events:auto; z-index:100; user-select:none;"
+             onclick="window.toggleBgmState()">
+            ♫ ON
+        </div>
+
+        <div id="top-info">
+            <div class="wave-badge" id="wave-info">WAVE 1</div>
+            <div class="wave-progress">
+                <div id="wave-bar-fill" class="wave-progress-fill"></div>
+            </div>
+            <div id="game-stats" style="font-size: 10px; color: #aaa; margin-top: 4px;">初期化中...</div>
+        </div>
+
+        <div id="bottom-hud">
+            <div class="orb-container left">
+                <div id="hp-orb-fill" class="orb-fill hp" style="height: 100%;"></div>
+                <div class="orb-text">❤️</div>
+                <div class="orb-label" id="hp-text">500</div>
+            </div>
+
+            <div class="center-panel">
+                <div class="stats-row">
+                    <div class="stat-item stat-gold">💰 <span id="gold-display">0</span></div>
+                    <div class="stat-item stat-sp">✨ SP: <span id="sp-display">0</span></div>
+                </div>
+                
+                <div class="xp-bar-container">
+                    <div id="xp-bar-fill" class="xp-bar-fill"></div>
+                </div>
+                <div style="font-size: 8px; color:#aaa; margin-bottom: 5px;">けいけんち</div>
+
+                <div class="control-buttons">
+                    <div class="hud-btn" onclick="toggleMenu('dock-modal')">
+                        🎒<span>そうび</span>
+                    </div>
+                    <div class="hud-btn" onclick="toggleMenu('skill-tree-modal')">
+                        🌲<span>ツリー</span>
+                    </div>
+                    <div class="hud-btn" onclick="toggleMenu('shop-modal')">
+                        🛒<span>店</span>
+                    </div>
+                    <div class="hud-btn" onclick="toggleMenu('help-modal')" style="border-color:#f1c40f; color:#f1c40f;">
+                        ?<span>ヘルプ</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="orb-container right" id="btn-shield-orb"
+                 style="cursor:pointer; transition:0.1s;"
+                 onmousedown="engineState.setShieldState(true)" 
+                 onmouseup="engineState.setShieldState(false)"
+                 ontouchstart="engineState.setShieldState(true); event.preventDefault();" 
+                 ontouchend="engineState.setShieldState(false); event.preventDefault();">
+                <div id="energy-orb-fill" class="orb-fill energy" style="height: 100%;"></div>
+                <div class="orb-text">🛡️</div>
+                <div class="orb-label" id="energy-text">100</div>
+            </div>
+        </div>
+
+        <!-- Side HUD Buttons: Swap (Left) and Pause (Right) -->
+        <div class="side-hud-btn" style="bottom:150px; left:10px; border-color:#00d2d3; color:#00d2d3;"
+             onclick="engineState.swapLoadout()">♻️</div>
+
+        <div class="side-hud-btn" style="bottom:150px; right:10px;"
+             onclick="engineState.togglePause()">⏸</div>
+
+        <div id="upgrade-selection-modal" class="modal-overlay hidden">
+            <h2 style="color:#f1c40f; text-shadow:0 0 10px orange; margin-bottom:20px;">レベルアップ！</h2>
+            <div class="upgrade-container" id="upgrade-options-container">
+                </div>
+            <div id="btn-upgrade-close" class="upgrade-btn" onclick="closeUpgradeModal()">あとで決める（SPを保持）</div>
+        </div>
+
+        <div id="dock-modal" class="modal-overlay hidden">
+            <div class="modal-header">
+                <div class="modal-title">装備 & インベントリ</div>
+                <button class="close-btn" onclick="toggleMenu('dock-modal')">×</button>
+            </div>
+            <div class="modal-content" id="dock-content">
+                <!-- Generated by JS -->
+            </div>
+        </div>
+
+        <div id="skill-tree-modal" class="modal-overlay hidden">
+            <div class="modal-header">
+                <div class="modal-title">スキルツリー</div>
+                <div id="tree-sp-info" style="color: #00d2d3; font-weight: bold; font-size: 14px; margin-left: auto; margin-right: 15px;">SP: 0</div>
+                <button class="close-btn" onclick="toggleMenu('skill-tree-modal')">×</button>
+            </div>
+            <div id="skill-tree-viewport">
+                <div id="skill-tree-content" style="width: 2000px; height: 1500px;"></div>
+            </div>
+            <div style="position:absolute; bottom:20px; left:20px; pointer-events:none; color:#aaa; font-size:12px; background:rgba(0,0,0,0.5); padding:5px;">
+                ピンチで拡大縮小 / ドラッグで移動
+            </div>
+        </div>
+
+        <div id="logic-modal" class="modal-overlay hidden">
+            <div class="modal-header">
+                <div class="modal-title">AI 作成</div>
+                <button class="upgrade-btn" style="background:#00d2d3; color:#000; margin-right:10px;" onclick="applyAiLogic()">決定</button>
+                <button class="close-btn" onclick="toggleMenu('logic-modal')">×</button>
+            </div>
+            <div class="modal-content" style="padding:0;">
+                <div id="blockly-div" style="width:100%; height:100%;"></div>
+            </div>
+        </div>
+
+        <div id="fuse-overlay">
+            <div class="fuse-banner" id="fuse-banner">
+                <div class="fuse-content">
+                    <span id="fuse-item-name">FIREBALL</span>
+                    <span class="fuse-text">UPGRADED</span>
+                    <span class="fuse-level" id="fuse-item-lv">Lv.2</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="shop-modal" class="modal-overlay hidden">
+            <div class="modal-header">
+                <div class="modal-title" style="color:#f1c40f;">お店</div>
+                <div id="shop-gold-info" style="color: #f1c40f; font-weight: bold; font-size: 14px; margin-left: auto; margin-right: 15px;">💰 0</div>
+                <button class="close-btn" onclick="toggleMenu('shop-modal')">×</button>
+            </div>
+            <div class="modal-content">
+                <div id="shop-message" style="background:#222; padding:10px; border-radius:4px; font-size:12px; margin-bottom:10px;">いらっしゃいませ...</div>
+                <div id="shop-grid"></div>
+            </div>
+        </div>
+
+        <!-- Special Move Cut-in Overlay -->
+        <div id="cutin-overlay">
+            <div class="cutin-banner" id="cutin-banner">
+                <img src="" class="cutin-image" id="cutin-img">
+                <div class="cutin-text-group">
+                    <div class="cutin-crew-name" id="cutin-crew-name">COMMANDER</div>
+                    <div class="cutin-ability-name" id="cutin-ability">ULTIMATE SKILL</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="help-modal" class="modal-overlay hidden">
+            <div class="modal-header">
+                <div class="modal-title">マニュアル</div>
+                <button class="close-btn" onclick="toggleMenu('help-modal')">×</button>
+            </div>
+            <div class="modal-content">
+                <div class="help-section">
+                    <div class="help-title">🎮 基本操作</div>
+                    <div class="help-desc">
+                        ・<strong>攻撃</strong>: 自動射撃（カーソル/タップで優先ターゲット指定可）<br>
+                        ・<strong>アイテム回収</strong>: ドロップ品をクリック/タップ<br>
+                        ・<strong>シールド</strong>: 右クリック / Space / 右下ボタン長押し<br>
+                        ・<strong>装備切替</strong>: Qキー / SWAPボタン
+                    </div>
+                </div>
+                <div class="help-section">
+                    <div class="help-title">🛡️ ジャストガード (重要)</div>
+                    <div class="help-desc">
+                        シールド展開の<strong>「直後」</strong>に敵弾を受けると、<br>
+                        弾を反射し <span style="color:#66fcf1">MPが回復</span> します。<br>
+                        MPが尽きるとシールドが割れるため、タイミングよく防ぐのが生存のカギです。
+                    </div>
+                </div>
+                <div class="help-section">
+                    <div class="help-title">⚔️ 装備と合成</div>
+                    <div class="help-desc">
+                        ・<strong>メイン(左端)</strong>: 武器GEM（赤枠）を装備<br>
+                        ・<strong>サポート(右2枠)</strong>: 強化GEM（緑枠）を装備<br>
+                        ・<strong>自動合成</strong>: 同じアイテムを3つ集めると上位Lvに進化<br>
+                        ・<strong>サブセット</strong>: 裏装備も 50% の性能で自動援護します。
+                    </div>
+                </div>
+                <div class="help-section">
+                    <div class="help-title">🔥 属性シナジー</div>
+                    <div class="help-desc">
+                        異なる状態異常を組み合わせると強力な効果が発生します。<br>
+                        例: <span style="color:#e74c3c">炎上</span> + <span style="color:#3498db">水浸</span> = <strong>蒸発 (大ダメージ)</strong><br>
+                        例: <span style="color:#f1c40f">感電</span> + <span style="color:#3498db">水浸</span> = <strong>伝播 (広範囲感電)</strong>
+                    </div>
+                </div>
+                <div class="help-section">
+                    <div class="help-title">👥 クルーシステム</div>
+                    <div class="help-desc">
+                        右下のキャラクターアイコンをクリックすると、強力な<br>
+                        <strong>ユニークスキル</strong>を発動できます（クールダウンあり）。
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module" src="config-manager.js"></script>
+    <script type="module" src="audio-manager.js"></script>
+    <script type="module" src="game.js"></script>
+    <script src="blocks.js"></script>
+    <script>
+        // Simple pinch/drag handler for skill tree will be implemented in ui.js
+        // Placeholder for close function
+        function closeUpgradeModal() {
+            document.getElementById('upgrade-selection-modal').classList.add('hidden');
+            if(window.engineState) window.engineState.isPaused = false;
+        }
+    </script>
+</body>
+</html>

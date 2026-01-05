@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Project OVERLORD: Defense Protocol</title>
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="https://unpkg.com/blockly/javascript_compressed.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b0c10;
+            --panel-bg: #1f2833;
+            --accent-cyan: #66fcf1;
+            --accent-purple: #c5c6c7;
+            --text-main: #c5c6c7;
+            --slot-border: #45a29e;
+        }
+
+        body, html { 
+            margin: 0; padding: 0; height: 100vh; 
+            background: var(--bg-color); color: var(--text-main); 
+            font-family: 'Segoe UI', 'Roboto', sans-serif; overflow: hidden;
+            user-select: none;
+        }
+
+        #main-layout {
+            display: grid;
+            grid-template-rows: 1fr 400px; 
+            height: 100vh; width: 100vw;
+        }
+
+        /* --- Game Viewport --- */
+        #game-viewport {
+            position: relative;
+            background: radial-gradient(circle at 50% 50%, #2c3e50 0%, #000000 100%);
+            border-bottom: 3px solid var(--slot-border);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+        #game-canvas { width: 100%; height: 100%; display: block; }
+
+        /* HUD */
+        #hud-container { 
+            position: absolute; top: 20px; left: 20px; width: 300px; pointer-events: none;
+        }
+        .bar-frame { 
+            background: rgba(0,0,0,0.6); height: 10px; border: 1px solid var(--slot-border);
+            transform: skewX(-20deg); overflow: hidden; margin-bottom: 8px;
+        }
+        .bar-fill-hp { background: #e74c3c; height: 100%; width: 100%; transition: width 0.2s; }
+        .bar-fill-xp { background: #2ecc71; height: 100%; width: 0%; transition: width 0.2s; }
+        
+        #game-stats {
+            font-family: 'Courier New', monospace; font-size: 12px; color: #fff;
+            text-shadow: 0 0 5px var(--slot-border); margin-top: 5px;
+        }
+
+        /* --- Control Panel --- */
+        #ui-control-panel {
+            background: #111;
+            display: grid;
+            grid-template-columns: 400px 1fr; /* Left: Workshop, Right: Logic */
+            gap: 10px; padding: 10px;
+            overflow: hidden;
+        }
+
+        /* Workshop Panel (Left) */
+        .workshop-panel {
+            display: flex; flex-direction: column; gap: 10px;
+            background: rgba(31, 40, 51, 0.3);
+            border: 1px solid #333; border-radius: 4px;
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        .section-header {
+            font-size: 11px; color: var(--accent-cyan); font-weight: bold;
+            text-transform: uppercase; letter-spacing: 1px;
+            border-bottom: 1px solid rgba(69, 162, 158, 0.3); margin-bottom: 5px;
+        }
+
+        /* Equipment Area */
+        .equipment-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            background: rgba(0,0,0,0.2); padding: 10px; border-radius: 4px;
+        }
+
+        .slot-group { display: flex; flex-direction: column; gap: 5px; }
+        .slot-label { font-size: 9px; color: #aaa; }
+
+        .gem-slot {
+            height: 45px; border: 1px solid var(--slot-border); background: rgba(0,0,0,0.4);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; color: #666; cursor: pointer; border-radius: 4px;
+            transition: all 0.2s; position: relative;
+        }
+        .gem-slot:hover { background: rgba(69, 162, 158, 0.1); color: #fff; }
+        .gem-slot.drag-over { background: rgba(69, 162, 158, 0.4); border-color: #fff; }
+
+        /* Inventory Area */
+        #inventory-grid {
+            display: grid; grid-template-columns: repeat(5, 1fr);
+            gap: 5px; flex-grow: 1; min-height: 100px;
+            align-content: start;
+        }
+        .inv-item { 
+            aspect-ratio: 1; border-radius: 4px; 
+            border: 1px solid rgba(255,255,255,0.1); cursor: grab;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-size: 9px; font-weight: bold; color: #fff;
+            background: rgba(0,0,0,0.3); user-select: none;
+        }
+        .inv-item:hover { border-color: #fff; background: rgba(255,255,255,0.1); }
+        .inv-item:active { cursor: grabbing; }
+
+        /* Salvage Area */
+        #salvage-area {
+            margin-top: auto; padding: 10px;
+            border: 1px dashed #e74c3c; border-radius: 4px;
+            text-align: center; font-size: 10px; color: #e74c3c;
+            transition: all 0.2s;
+        }
+        #salvage-area.drag-over { background: rgba(231, 76, 60, 0.2); color: #fff; }
+
+        /* Logic Panel (Right) */
+        .logic-panel {
+            background: #fff; border-radius: 4px; overflow: hidden; position: relative;
+        }
+        #blockly-div { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+        .btn-apply {
+            position: absolute; top: 10px; right: 10px; z-index: 50;
+            background: var(--accent-cyan); color: #000; border: none;
+            padding: 6px 16px; font-weight: bold; cursor: pointer;
+            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+        }
+        
+        /* Upgrade Overlay */
+        #upgrade-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(11, 12, 16, 0.95); z-index: 100;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .upgrade-card {
+            background: var(--panel-bg); border: 1px solid var(--slot-border);
+            padding: 20px; margin: 0 10px; width: 140px; text-align: center; cursor: pointer;
+        }
+        .upgrade-card:hover { transform: scale(1.05); border-color: #fff; }
+
+    </style>
+</head>
+<body>
+    <div id="main-layout">
+        <div id="game-viewport">
+            <canvas id="game-canvas" width="1200" height="600"></canvas>
+            
+            <div id="hud-container">
+                <div style="font-size:10px; color:#aaa;">INTEGRITY</div>
+                <div class="bar-frame"><div id="hp-bar-fill" class="bar-fill-hp"></div></div>
+                <div style="font-size:10px; color:#aaa;">SYNC RATE (XP)</div>
+                <div class="bar-frame"><div id="xp-bar-fill" class="bar-fill-xp"></div></div>
+                <div id="game-stats">SYSTEM READY</div>
+            </div>
+
+            <div id="upgrade-overlay">
+                <h2 style="color:var(--accent-cyan); font-family:'Courier New';">SYSTEM UPGRADE</h2>
+                <div id="upgrade-options" style="display:flex;"></div>
+            </div>
+        </div>
+
+        <div id="ui-control-panel">
+            <div class="workshop-panel">
+                <div class="section-header">LOADOUT CONFIGURATION</div>
+                
+                <div class="equipment-grid">
+                    <div class="slot-group">
+                        <div class="slot-label">PRIMARY CORE (Active)</div>
+                        <div class="gem-slot" id="slot-0" 
+                             ondragover="allowDrop(event)" ondrop="handleDrop(event, 'SLOT', 0)">
+                             [ EMPTY ]
+                        </div>
+                        
+                        <div class="slot-label" style="margin-top:5px;">SUPPORT MODULES</div>
+                        <div class="gem-slot" id="slot-1" 
+                             ondragover="allowDrop(event)" ondrop="handleDrop(event, 'SLOT', 1)">
+                             [ LINK A ]
+                        </div>
+                        <div class="gem-slot" id="slot-2" 
+                             ondragover="allowDrop(event)" ondrop="handleDrop(event, 'SLOT', 2)">
+                             [ LINK B ]
+                        </div>
+                    </div>
+
+                    <div class="slot-group">
+                        <div class="slot-label">RING SLOT</div>
+                        <div class="gem-slot" id="slot-ring" 
+                             ondragover="allowDrop(event)" ondrop="handleDrop(event, 'SLOT', 'RING')">
+                             [ RING ]
+                        </div>
+                        
+                        <div class="slot-label" style="margin-top:5px;">AMULET SLOT</div>
+                        <div class="gem-slot" id="slot-amulet" 
+                             ondragover="allowDrop(event)" ondrop="handleDrop(event, 'SLOT', 'AMULET')">
+                             [ AMULET ]
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-header" style="margin-top:10px;">STORAGE UNIT</div>
+                <div id="inventory-grid" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'INVENTORY')"></div>
+
+                <div id="salvage-area" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'SALVAGE')">
+                    ⚠️ DRAG ITEM HERE TO SALVAGE (+XP)
+                </div>
+            </div>
+
+            <div class="logic-panel">
+                <button class="btn-apply" onclick="applyAiLogic()">UPLOAD LOGIC</button>
+                <div id="blockly-div"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module" src="game.js"></script>
+    <script src="blocks.js"></script>
+</body>
+</html>

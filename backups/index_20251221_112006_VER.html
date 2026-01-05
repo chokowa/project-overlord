@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Castle Guardian: Gem Link - Intelligence Edition</title>
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="https://unpkg.com/blockly/javascript_compressed.js"></script>
+    <style>
+        body, html { 
+            margin: 0; padding: 0; height: 100vh; 
+            background: #0f0f0f; color: #ecf0f1; 
+            font-family: 'Consolas', 'Courier New', monospace; overflow: hidden; 
+        }
+
+        #main-layout {
+            display: grid;
+            grid-template-rows: 1fr 350px; /* Blockly用に高さを拡張 */
+            height: 100vh; width: 100vw;
+        }
+
+        #game-viewport {
+            position: relative;
+            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+            border-bottom: 3px solid #34495e;
+            overflow: hidden;
+        }
+
+        #game-canvas { width: 100%; height: 100%; display: block; }
+
+        /* UI制御パネルの再編 */
+        #ui-control-panel {
+            background: #2c3e50;
+            display: grid;
+            grid-template-columns: 300px 1fr 300px; /* インベントリ | Blockly | ソケット */
+            gap: 15px;
+            padding: 10px;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
+        }
+
+        /* Blockly ワークスペース */
+        #blockly-area {
+            position: relative;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        #blockly-div {
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .btn-apply {
+            background: #27ae60; color: white; border: none;
+            padding: 5px 15px; border-radius: 4px; cursor: pointer;
+            font-weight: bold; font-family: inherit;
+        }
+        .btn-apply:hover { background: #2ecc71; }
+
+        .socket-board, .inventory-board {
+            background: #34495e; padding: 10px; border-radius: 8px;
+            display: flex; flex-direction: column; height: 310px;
+        }
+
+        .socket-group {
+            display: flex; justify-content: space-around;
+            margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px;
+        }
+
+        .gem-slot {
+            width: 60px; height: 60px; border: 3px dashed #95a5a6;
+            border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-size: 10px; text-align: center;
+            cursor: pointer; background: rgba(0,0,0,0.2);
+        }
+
+        #inventory-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 8px; overflow-y: auto; flex-grow: 1;
+        }
+
+        .inv-item { width: 100%; aspect-ratio: 1; border-radius: 4px; border: 2px solid #555; cursor: pointer; }
+
+        /* HUD & Overlays */
+        #upgrade-overlay {
+            display: none; position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 100;
+            justify-content: center; align-items: center; flex-direction: column;
+        }
+        .card-container { display: flex; gap: 20px; }
+        .upgrade-card {
+            width: 150px; height: 220px; background: #2980b9;
+            border: 3px solid #f1c40f; border-radius: 15px;
+            padding: 15px; text-align: center; cursor: pointer;
+        }
+        
+        #hud-container { position: absolute; top: 15px; left: 15px; pointer-events: none; width: 250px; }
+        .bar-bg { background: #333; height: 10px; border-radius: 5px; margin-bottom: 5px; overflow: hidden; }
+        .bar-fill-hp { background: #e74c3c; height: 100%; }
+        .bar-fill-xp { background: #2ecc71; height: 100%; }
+    </style>
+</head>
+<body>
+    <div id="main-layout">
+        <div id="game-viewport">
+            <canvas id="game-canvas" width="1200" height="600"></canvas>
+            <div id="upgrade-overlay">
+                <h1 style="color:#f1c40f;">LEVEL UP</h1>
+                <div class="card-container" id="upgrade-options"></div>
+            </div>
+            <div id="hud-container">
+                <div class="bar-bg"><div id="hp-bar-fill" class="bar-fill-hp" style="width: 100%;"></div></div>
+                <div class="bar-bg"><div id="xp-bar-fill" class="bar-fill-xp" style="width: 0%;"></div></div>
+                <div id="game-stats" style="font-size: 14px;"></div>
+            </div>
+        </div>
+
+        <div id="ui-control-panel">
+            <div class="inventory-board">
+                <div class="panel-header"><strong>INVENTORY</strong></div>
+                <div id="inventory-grid"></div>
+            </div>
+
+            <div id="blockly-area">
+                <div class="panel-header" style="position: absolute; top: 5px; right: 10px; z-index: 10; width: auto;">
+                    <button class="btn-apply" onclick="applyAiLogic()">AI適用</button>
+                </div>
+                <div id="blockly-div"></div>
+            </div>
+
+            <div class="socket-board">
+                <div class="panel-header"><strong>GEM LINKS</strong></div>
+                <div class="socket-group">
+                    <div class="gem-slot active-type" id="slot-0" data-index="0">ACTIVE</div>
+                    <div class="gem-slot support-type" id="slot-1" data-index="1">SUPPORT</div>
+                    <div class="gem-slot support-type" id="slot-2" data-index="2">SUPPORT</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="game.js"></script>
+    <script src="blocks.js"></script>
+</body>
+</html>

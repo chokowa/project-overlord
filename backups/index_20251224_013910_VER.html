@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Project OVERLORD: Vertical Ops</title>
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="https://unpkg.com/blockly/javascript_compressed.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b0c10;
+            --panel-bg: rgba(16, 24, 32, 0.95);
+            --panel-border: rgba(102, 252, 241, 0.3);
+            --accent-cyan: #66fcf1;
+            --accent-dark-cyan: #45a29e;
+            --accent-gold: #f1c40f;
+            --accent-red: #e74c3c;
+            --text-main: #c5c6c7;
+            --hud-height: 140px;
+        }
+
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background: #000; color: var(--text-main); 
+            font-family: 'Rajdhani', 'Hiragino Kaku Gothic Pro', sans-serif; 
+            overflow: hidden; user-select: none;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        /* Sci-Fi Font Import (Optional, using system font fallback for speed) */
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap');
+
+        #device-frame {
+            position: relative;
+            width: 100%; height: 100%;
+            max-width: 100%; max-height: 100dvh;
+            background: radial-gradient(circle at 50% 80%, #1a1a2e 0%, #000000 100%);
+            overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+
+        #game-canvas { 
+            width: 100%; height: 100%; 
+            flex-grow: 1; display: block; 
+            object-fit: contain;
+            touch-action: none;
+        }
+
+        /* --- Sci-Fi HUD Container (Bottom) --- */
+        #bottom-hud {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            height: calc(var(--hud-height) + env(safe-area-inset-bottom));
+            pointer-events: none;
+            z-index: 50;
+            display: flex; justify-content: center; align-items: flex-end;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* Cockpit Dashboard Shape */
+        .cockpit-panel {
+            position: relative;
+            width: 100%; max-width: 600px;
+            height: 100%;
+            display: flex; justify-content: space-between; align-items: flex-end;
+            padding: 0 10px 10px 10px;
+            box-sizing: border-box;
+            background: linear-gradient(to top, #0b1016 0%, rgba(11, 16, 22, 0.8) 80%, transparent 100%);
+        }
+
+        /* --- Wing Panels (Left/Right) --- */
+        .hud-wing {
+            width: 80px; height: 110px;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            position: relative;
+            pointer-events: auto;
+            /* 斜めカットのデザイン */
+            clip-path: polygon(0 20%, 20% 0, 100% 0, 100% 100%, 0% 100%); 
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+            padding-bottom: 5px;
+        }
+        .hud-wing.right {
+            clip-path: polygon(0 0, 80% 0, 100% 20%, 100% 100%, 0 100%);
+        }
+
+        /* --- Gauge Bars --- */
+        .gauge-container {
+            width: 40px; height: 70px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #333;
+            border-radius: 2px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 5px;
+        }
+        /* Grid overlay for gauge */
+        .gauge-grid {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background-image: linear-gradient(rgba(0,0,0,0.5) 1px, transparent 1px);
+            background-size: 100% 10px;
+            z-index: 2; pointer-events: none;
+        }
+        .gauge-fill {
+            width: 100%; bottom: 0; position: absolute;
+            transition: height 0.2s;
+        }
+        .gauge-fill.hp {
+            background: linear-gradient(to top, #c0392b, #e74c3c);
+            box-shadow: 0 0 10px #c0392b;
+        }
+        .gauge-fill.energy {
+            background: linear-gradient(to top, #2980b9, #66fcf1);
+            box-shadow: 0 0 10px #66fcf1;
+        }
+        .gauge-label {
+            font-size: 10px; color: #fff; font-weight: bold; margin-bottom: 2px; letter-spacing: 1px;
+        }
+        .gauge-value {
+            font-family: monospace; font-size: 14px; font-weight: bold; color: #fff; text-shadow: 0 0 5px currentColor;
+            z-index: 3; position: absolute; bottom: 2px; width: 100%; text-align: center;
+        }
+
+        /* --- Wing Buttons (Swap/Pause) --- */
+        .wing-btn {
+            width: 100%; height: 30px;
+            background: rgba(102, 252, 241, 0.1);
+            border-top: 1px solid var(--panel-border);
+            display: flex; align-items: center; justify-content: center;
+            color: var(--accent-cyan);
+            font-size: 16px; cursor: pointer;
+            transition: 0.2s;
+        }
+        .wing-btn:active { background: rgba(102, 252, 241, 0.3); }
+
+        /* --- Center Console --- */
+        .center-console {
+            flex: 1; height: 90px;
+            margin: 0 10px;
+            display: flex; flex-direction: column; justify-content: flex-end;
+            pointer-events: auto;
+            position: relative;
+        }
+        
+        /* Holographic Frame */
+        .center-console::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            border: 1px solid var(--panel-border);
+            border-top: none;
+            background: linear-gradient(to bottom, transparent, rgba(69, 162, 158, 0.1));
+            transform: perspective(500px) rotateX(20deg);
+            z-index: -1;
+        }
+
+        .info-row {
+            display: flex; justify-content: space-around; width: 100%;
+            margin-bottom: 8px;
+        }
+        .stat-box {
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #444;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px; font-weight: bold;
+            display: flex; align-items: center; gap: 5px;
+            color: var(--accent-cyan);
+        }
+        
+        .xp-bar-sci {
+            width: 100%; height: 4px; background: #222;
+            border: 1px solid #444; position: relative;
+            margin-bottom: 8px;
+        }
+        .xp-fill-sci {
+            height: 100%; background: var(--accent-gold);
+            width: 0%; box-shadow: 0 0 5px var(--accent-gold);
+            transition: width 0.3s;
+        }
+
+        .menu-row {
+            display: flex; gap: 4px; width: 100%;
+        }
+        .menu-btn {
+            flex: 1; height: 36px;
+            background: rgba(16, 24, 32, 0.9);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            font-size: 10px; font-weight: bold;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer;
+            clip-path: polygon(10% 0, 100% 0, 100% 80%, 90% 100%, 0 100%, 0 20%);
+            transition: 0.2s;
+        }
+        .menu-btn:active { background: var(--accent-dark-cyan); color: #000; }
+        .menu-btn span { font-size: 14px; margin-bottom: 2px; }
+
+        /* --- Quick Buy (Floating) --- */
+        .quick-buy-container {
+            position: absolute;
+            bottom: calc(var(--hud-height) + 20px + env(safe-area-inset-bottom));
+            display: flex; gap: 10px;
+            z-index: 100; pointer-events: none;
+        }
+        #quick-buy-left { right: 50%; margin-right: 40px; }
+        #quick-buy-right { left: 50%; margin-left: 40px; }
+
+        .quick-btn {
+            width: 40px; height: 40px;
+            background: rgba(11, 16, 22, 0.9);
+            border: 1px solid var(--accent-cyan);
+            color: var(--accent-cyan);
+            /* Hexagon Shape */
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; pointer-events: auto;
+            transition: 0.2s;
+            box-shadow: 0 0 10px rgba(102, 252, 241, 0.2);
+        }
+        .quick-btn:active { transform: scale(0.9); background: var(--accent-cyan); color: #000; }
+        .quick-btn.disabled { filter: grayscale(1) opacity(0.3); border-color: #555; }
+        .quick-btn .icon { font-size: 18px; }
+
+        /* --- Top Info --- */
+        #top-info {
+            position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; z-index: 40;
+        }
+        .wave-badge {
+            background: rgba(0,0,0,0.8); border: 1px solid var(--accent-gold);
+            color: var(--accent-gold); padding: 4px 20px;
+            clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%);
+            font-weight: bold; font-family: 'Rajdhani', sans-serif; font-size: 18px; letter-spacing: 2px;
+        }
+        .wave-progress {
+            width: 240px; height: 4px; background: rgba(255,255,255,0.1);
+            margin: 5px auto; border: 1px solid #555;
+        }
+        .wave-progress-fill { height: 100%; background: var(--accent-gold); width: 0%; }
+
+        /* --- Modals (Common) --- */
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 8, 12, 0.95); 
+            z-index: 6000; display: flex; flex-direction: column;
+            transition: opacity 0.2s; opacity: 1; pointer-events: auto;
+            backdrop-filter: blur(5px);
+        }
+        .modal-overlay.hidden { opacity: 0; pointer-events: none; }
+        
+        .modal-header {
+            padding: calc(15px + env(safe-area-inset-top)) 20px 15px;
+            border-bottom: 2px solid var(--panel-border);
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(11, 16, 22, 1);
+        }
+        .modal-title { font-size: 20px; font-weight: bold; color: var(--accent-cyan); letter-spacing: 2px; }
+        .close-btn { background: none; border: 1px solid var(--accent-red); color: var(--accent-red); padding: 5px 15px; cursor: pointer; font-family: monospace; }
+        
+        .modal-content { flex-grow: 1; padding: 15px; overflow-y: auto; color: #ddd; }
+
+        /* --- Overlays (Cutin, Fuse) --- */
+        #cutin-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 8000; overflow: hidden; display: none;
+        }
+        .cutin-banner {
+            position: absolute; top: 40%; left: -110%; width: 120%; height: 80px;
+            background: linear-gradient(90deg, transparent, rgba(0,210,211,0.8) 20%, rgba(0,210,211,0.8) 80%, transparent);
+            transform: skewX(-20deg); display: flex; align-items: center;
+            border-top: 2px solid #fff; border-bottom: 2px solid #fff;
+        }
+        .cutin-image { height: 160%; margin-left: 15%; margin-top: -20px; transform: skewX(20deg); filter: drop-shadow(0 0 10px #000); }
+        .cutin-text-group { margin-left: 20px; transform: skewX(20deg); color: #fff; text-shadow: 0 0 10px #00d2d3; }
+        .cutin-ability-name { font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; }
+        
+        /* Utility */
+        .hidden { display: none !important; }
+
+        /* --- Title Screen --- */
+        #title-screen {
+            background: radial-gradient(circle at 50% 30%, #1f2833 0%, #0b0c10 80%);
+            z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .title-logo {
+            font-family: 'Rajdhani', sans-serif; font-size: 48px; font-weight: 900;
+            color: #fff; text-shadow: 0 0 20px var(--accent-cyan), 0 0 40px var(--accent-cyan);
+            margin-bottom: 20px; text-align: center; letter-spacing: 5px;
+        }
+        .title-btn {
+            width: 240px; padding: 15px; margin: 10px;
+            background: rgba(0, 0, 0, 0.5); border: 1px solid var(--accent-cyan);
+            color: var(--accent-cyan); text-align: center; cursor: pointer;
+            font-family: 'Rajdhani', sans-serif; font-size: 18px; font-weight: bold; letter-spacing: 3px;
+            transition: 0.3s;
+            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+        }
+        .title-btn:hover { background: var(--accent-cyan); color: #000; box-shadow: 0 0 20px var(--accent-cyan); }
+        
+        /* Modal Styles Placeholder (for ui.js usage) */
+        .inv-item, .gem-slot, .upgrade-card, .tree-node { /* ... existing styles needed? ui.js handles some */ }
+        /* Include minimal styles for dynamic elements created in ui.js if not inline */
+        .upgrade-card {
+            background: rgba(30, 40, 50, 0.8); border: 1px solid #555; padding: 10px; margin-bottom: 10px;
+            display: flex; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s;
+        }
+        .upgrade-card:hover { border-color: var(--accent-gold); background: rgba(50, 60, 70, 0.9); }
+        .upgrade-card.rare { border-color: var(--accent-gold); }
+        .upgrade-icon { font-size: 24px; }
+    </style>
+</head>
+<body>
+    <div id="device-frame">
+        <!-- Game Layer -->
+        <canvas id="game-canvas" width="600" height="900"></canvas>
+
+        <!-- Top Info HUD -->
+        <div id="top-info">
+            <div class="wave-badge" id="wave-info">SYSTEM READY</div>
+            <div class="wave-progress">
+                <div id="wave-bar-fill" class="wave-progress-fill"></div>
+            </div>
+            <div id="game-stats" style="font-size: 10px; color: #aaa; margin-top: 4px; font-family: monospace;">INIT...</div>
+        </div>
+
+        <!-- Floating Quick Buy Buttons -->
+        <div id="quick-buy-left" class="quick-buy-container">
+            <div class="quick-btn" id="qbtn-repair" onclick="engineState.buyShopItem('repair')"><span class="icon">🔧</span></div>
+            <div class="quick-btn" id="qbtn-drone_col" onclick="engineState.buyShopItem('drone_col')"><span class="icon">🧹</span></div>
+        </div>
+        <div id="quick-buy-right" class="quick-buy-container">
+            <div class="quick-btn" id="qbtn-drone_atk" onclick="engineState.buyShopItem('drone_atk')"><span class="icon">🛸</span></div>
+            <div class="quick-btn" id="qbtn-clone" onclick="engineState.buyShopItem('clone')"><span class="icon">👥</span></div>
+        </div>
+
+        <!-- Artifacts HUD (Generated) -->
+        <div id="artifact-hud" style="position:absolute; top:80px; left:10px; width:40px; display:flex; flex-direction:column; gap:5px; pointer-events:auto; z-index:40;"></div>
+
+        <!-- Speed & BGM Controls -->
+        <div id="speed-btn" onclick="window.engineState && window.engineState.toggleGameSpeed()"
+             style="position:absolute; top:20px; right:20px; width:80px; padding:5px; background:rgba(0,0,0,0.5); border:1px solid #7f8c8d; color:#fff; font-size:12px; text-align:center; cursor:pointer; z-index:100; font-family:monospace;">▶️ x1.0</div>
+        <div id="bgm-btn" onclick="window.toggleBgmState()"
+             style="position:absolute; top:55px; right:20px; width:80px; padding:5px; background:rgba(0,0,0,0.5); border:1px solid #7f8c8d; color:var(--accent-cyan); font-size:12px; text-align:center; cursor:pointer; z-index:100; font-family:monospace;">♫ ON</div>
+
+        <!-- Sci-Fi Cockpit HUD (Bottom) -->
+        <div id="bottom-hud">
+            <div class="cockpit-panel">
+                <!-- Left Wing: HP & Swap -->
+                <div class="hud-wing">
+                    <div class="wing-btn" onclick="engineState.swapLoadout()">♻️ SWAP</div>
+                    <div class="gauge-label">INTEGRITY</div>
+                    <div class="gauge-container">
+                        <div class="gauge-grid"></div>
+                        <div id="hp-orb-fill" class="gauge-fill hp" style="height: 100%;"></div>
+                        <div id="hp-text" class="gauge-value">100%</div>
+                    </div>
+                </div>
+
+                <!-- Center Console: Stats & Menu -->
+                <div class="center-console">
+                    <div class="info-row">
+                        <div class="stat-box" style="color:#f1c40f;">💰 <span id="gold-display">0</span></div>
+                        <div class="stat-box" style="color:#00d2d3;">✨ SP <span id="sp-display">0</span></div>
+                    </div>
+                    
+                    <div class="xp-bar-sci">
+                        <div id="xp-bar-fill" class="xp-fill-sci"></div>
+                    </div>
+
+                    <div class="menu-row">
+                        <div class="menu-btn" onclick="toggleMenu('dock-modal')"><span>🎒</span>EQUIP</div>
+                        <div class="menu-btn" onclick="toggleMenu('skill-tree-modal')"><span>🌲</span>TREE</div>
+                        <div class="menu-btn" onclick="toggleMenu('shop-modal')"><span>🛒</span>SHOP</div>
+                        <div class="menu-btn" onclick="toggleMenu('help-modal')" style="border-color:var(--accent-gold); color:var(--accent-gold);"><span>?</span>HELP</div>
+                    </div>
+                </div>
+
+                <!-- Right Wing: Energy & Pause -->
+                <div class="hud-wing right" 
+                     id="btn-shield-orb"
+                     onmousedown="engineState.setShieldState(true)" 
+                     onmouseup="engineState.setShieldState(false)"
+                     ontouchstart="engineState.setShieldState(true); event.preventDefault();" 
+                     ontouchend="engineState.setShieldState(false); event.preventDefault();">
+                    
+                    <div class="wing-btn" onclick="event.stopPropagation(); engineState.togglePause();">⏸ PAUSE</div>
+                    <div class="gauge-label">ENERGY</div>
+                    <div class="gauge-container">
+                        <div class="gauge-grid"></div>
+                        <div id="energy-orb-fill" class="gauge-fill energy" style="height: 100%;"></div>
+                        <div id="energy-text" class="gauge-value">100</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modals -->
+        <div id="title-screen" class="modal-overlay">
+            <div class="title-logo">PROJECT<br>OVERLORD</div>
+            <div style="color:#aaa; letter-spacing:3px; margin-bottom:40px;">VERTICAL OPS V3</div>
+            <div class="title-btn" onclick="startGame()">MISSION START</div>
+            <div class="title-btn" onclick="toggleMenu('synergy-modal')" style="border-color:#f1c40f; color:#f1c40f;">ARCHIVE</div>
+            <div class="title-btn" onclick="toggleMenu('help-modal')">MANUAL</div>
+        </div>
+
+        <div id="upgrade-selection-modal" class="modal-overlay hidden" style="justify-content:center; align-items:center;">
+            <h2 style="color:#f1c40f; text-shadow:0 0 10px orange;">SYSTEM UPGRADE</h2>
+            <div id="upgrade-options-container" style="width:90%; max-width:400px; display:flex; flex-direction:column; gap:10px;"></div>
+            <button id="btn-upgrade-close" class="title-btn" style="width:auto; margin-top:20px;" onclick="closeUpgradeModal()">SKIP</button>
+        </div>
+
+        <div id="dock-modal" class="modal-overlay hidden">
+            <div class="modal-header">
+                <div class="modal-title">ARMORY</div>
+                <button class="close-btn" onclick="toggleMenu('dock-modal')">CLOSE</button>
+            </div>
+            <div class="modal-content" id="dock-content"></div>
+        </div>
+
+        <div id="skill-tree-modal" class="modal-overlay hidden">
+            <div class="modal-header">
+                <div class="modal-title">NEURAL NETWORK</div>
+                <div id="tree-sp-info" style="color:#00d2d3;">SP: 0</div>
+                <button class="close-btn" onclick="toggleMenu('skill-tree-modal')">CLOSE</button>
+            </div>
+            <div id="skill-tree-viewport" style="flex:1; position:relative; overflow:hidden; background:#111;">
+                <div id="skill-tree-content" style="width:2000px; height:1500px;"></div>
+            </div>
+        </div>
+
+        <div id="shop-modal" class="modal-overlay hidden">
+            <div class="modal-header">
+                <div class="modal-title" style="color:#f1c40f;">SUPPLY DEPOT</div>
+                <div id="shop-gold-info" style="color:#f1c40f;">💰 0</div>
+                <button class="close-btn" onclick="toggleMenu('shop-modal')">CLOSE</button>
+            </div>
+            <div class="modal-content">
+                <div id="shop-message" style="background:#222; padding:10px; margin-bottom:10px; border:1px solid #444;">Welcome, Commander.</div>
+                <div id="shop-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;"></div>
+            </div>
+        </div>
+        
+        <div id="help-modal" class="modal-overlay hidden">
+            <div class="modal-header">
+                <div class="modal-title">OPERATION MANUAL</div>
+                <button class="close-btn" onclick="toggleMenu('help-modal')">CLOSE</button>
+            </div>
+            <div class="modal-content">
+                <!-- Content injected by ui.js or static -->
+                <p><strong>ATTACK:</strong> Auto-fire. Tap to target.</p>
+                <p><strong>SHIELD:</strong> Press Right Panel / Space / Right Click. Blocks attacks but drains Energy.</p>
+                <p><strong>JUST GUARD:</strong> Activate Shield just before impact to reflect & restore MP.</p>
+            </div>
+        </div>
+
+        <div id="synergy-modal" class="modal-overlay hidden">
+            <div class="modal-header">
+                <div class="modal-title">SYNERGY LOGS</div>
+                <button class="close-btn" onclick="toggleMenu('synergy-modal')">CLOSE</button>
+            </div>
+            <div class="modal-content" id="synergy-list"></div>
+        </div>
+
+        <div id="cutin-overlay"><div class="cutin-banner" id="cutin-banner"><img src="" class="cutin-image" id="cutin-img"><div class="cutin-text-group"><div class="cutin-crew-name" id="cutin-crew-name"></div><div class="cutin-ability-name" id="cutin-ability"></div></div></div></div>
+        
+        <div id="fuse-overlay" style="position:absolute; top:200px; width:100%; pointer-events:none; display:none; z-index:7000;">
+            <div id="fuse-banner" style="background:rgba(0,210,211,0.2); border:1px solid #66fcf1; text-align:center; padding:10px; color:#fff; font-weight:bold;">
+                <span id="fuse-item-name">ITEM</span> UPGRADED <span id="fuse-item-lv">Lv.2</span>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="config-manager.js"></script>
+    <script type="module" src="audio-manager.js"></script>
+    <script type="module" src="game.js"></script>
+    <script src="blocks.js"></script>
+    <script>
+        function closeUpgradeModal() {
+            document.getElementById('upgrade-selection-modal').classList.add('hidden');
+            if(window.engineState) window.engineState.isPaused = false;
+        }
+    </script>
+</body>
+</html>
