@@ -140,6 +140,11 @@ class GameEngine {
         this.activeBeam = null; // Object pooling: reuse beam instance
         this.beamLockedTarget = null; // Locked target during beam to prevent flickering
 
+        // Beam performance optimization: cache trig functions
+        this._lastBeamAngle = null;
+        this._cachedCos = 0;
+        this._cachedSin = 0;
+
         // [Hardcore] Overdrive System
         this.isOverdrive = false; // 1.2x damage, heat locked at max
         this.overdriveTimer = 0;
@@ -1063,17 +1068,44 @@ Object.assign(GameEngine.prototype, {
                 this.activeBeam.updateBeam(beamAngle, beamWidth, beamLength, blastColor, isCritical);
             }
 
+            // Cache trig functions when angle changes (performance optimization)
+            if (beamAngle !== this._lastBeamAngle) {
+                this._lastBeamAngle = beamAngle;
+                this._cachedCos = Math.cos(-beamAngle);
+                this._cachedSin = Math.sin(-beamAngle);
+            }
+
+            // Performance tracking
+            const perfStart = performance.now();
+            let enemiesChecked = 0;
+            let enemiesSkipped = 0;
+            let enemiesHit = 0;
+
             // Damage enemies in beam
             activeEnemies.forEach(enemy => {
+                if (!enemy.isActive) return;
+
+                enemiesChecked++;
+
+                // Early skip: rough distance check before expensive calculations
                 const dx = enemy.positionX - RENDER_CONSTANTS.TURRET_POS_X;
                 const dy = enemy.positionY - RENDER_CONSTANTS.TURRET_POS_Y;
-                const rotatedX = dx * Math.cos(-beamAngle) - dy * Math.sin(-beamAngle);
-                const rotatedY = dx * Math.sin(-beamAngle) + dy * Math.cos(-beamAngle);
+                const roughDist = Math.abs(dx) + Math.abs(dy); // Manhattan distance
+
+                if (roughDist > beamLength + 100) {
+                    enemiesSkipped++;
+                    return; // Too far, skip expensive rotation calculations
+                }
+
+                // Use cached trig functions
+                const rotatedX = dx * this._cachedCos - dy * this._cachedSin;
+                const rotatedY = dx * this._cachedSin + dy * this._cachedCos;
 
                 if (rotatedX > 0 && rotatedX < beamLength && Math.abs(rotatedY) < beamWidth / 2) {
                     const centerDist = Math.abs(rotatedY) / (beamWidth / 2);
                     const actualDamage = damage * (1 - centerDist * 0.3);
                     enemy.takeDamage(actualDamage, 'heat_blast', this);
+                    enemiesHit++;
 
                     if (isCritical && Math.random() < 0.05) {
                         if (!enemy.statusEffects) enemy.statusEffects = {};
@@ -1083,6 +1115,15 @@ Object.assign(GameEngine.prototype, {
                     }
                 }
             });
+
+            // Log performance every 60 frames (once per second at 60fps)
+            if (!this._beamFrameCount) this._beamFrameCount = 0;
+            this._beamFrameCount++;
+
+            if (this._beamFrameCount % 60 === 0) {
+                const perfTime = performance.now() - perfStart;
+                console.log(`[Heat Blast] Frame time: ${perfTime.toFixed(2)}ms | Enemies: ${enemiesChecked} | Skipped: ${enemiesSkipped} | Hit: ${enemiesHit}`);
+            }
 
             // Beam particles (reduced for performance: 30%→15%, 5→3 particles)
             if (Math.random() < 0.15) {
