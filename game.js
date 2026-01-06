@@ -2819,195 +2819,199 @@ class EnemyUnit {
             }
         }
 
-        draw(context) {
-            context.save();
-
-            if (this.isDying) {
-                // 徐々に透明にし、小さくする
-                context.globalAlpha = Math.max(0, 1.0 - this.deathProgress);
-                const deathScale = 1.0 - (this.deathProgress * 0.4);
-                context.translate(this.positionX, this.positionY);
-                context.scale(deathScale, deathScale);
-                context.translate(-this.positionX, -this.positionY);
-            }
-
-            // 1. Target Marker
-            if (engineState.manualTargetId === this.id) {
-                context.strokeStyle = EFFECT_CONSTANTS.COLOR_TARGET;
-                context.lineWidth = 2;
-                context.beginPath();
-                context.arc(this.positionX, this.positionY, this.size * 0.8, 0, Math.PI * 2);
-                context.stroke();
-            }
-
-            // 2. Determine Color based on Status
-            if (this.flashTime > 0) context.fillStyle = "#ffffff";
-            else if (this.confusionTimer > 0) context.fillStyle = "#e056fd";
-            else if (this.freezeTimer > 0) context.fillStyle = EFFECT_CONSTANTS.COLOR_FREEZE;
-            else if (this.stunTimer > 0) context.fillStyle = "#7f8c8d";
-            else if (this.burnTimer > 0) context.fillStyle = EFFECT_CONSTANTS.COLOR_BURN;
-            else if (this.poisonTimer > 0) context.fillStyle = "#8e44ad";
-            else if (this.soakedTimer > 0) context.fillStyle = "#3498db";
-            else if (this.shockTimer > 0) context.fillStyle = "#f1c40f";
-            else if (this.leechTimer > 0) context.fillStyle = "#2ecc71";
-            else context.fillStyle = this.tier.color;
-
-            const drawSize = this.size;
-            const halfSize = drawSize / 2;
-
-            // 3. Draw Enemy Image (New)
-            let enemyImg = null;
-            const tierId = this.tier.id;
-
-            if (tierId === 'BOSS') {
-                // Determine Boss Type Logic (Simple matching by name or wave, assuming Boss Name is set)
-                // Currently EnemyUnit doesn't hold 'name' directly from config unless passed, 
-                // but we can infer or if BOSS_WAVES logic attached name to this.tier
-                // However, BOSS_WAVES config is used to spawn. Let's check tier name?
-                // Actually, `this.tier` is a reference to ENEMY_TIERS object.
-
-                // Note: Bosses are spawned with currentWaveNumber Check in main logic.
-                // Let's rely on specific boss tracking or just Cycle:
-                // Wave 1-3: Slime, 4-6: Shadow, 7+: Golem?
-                // Or simpler: Check the level/wave when spawned.
-
-                // Current simple logic:
-                if (engineState.currentWaveNumber % 10 === 0 && engineState.currentWaveNumber >= 10) enemyImg = GAME_ASSETS.BOSS_GOLEM;
-                else if (engineState.currentWaveNumber >= 5) enemyImg = GAME_ASSETS.BOSS_SHADOW; // Late game standard boss
-                else enemyImg = GAME_ASSETS.BOSS_SLIME; // Early boss
-
-                // To be precise: match the BOSS_WAVES config if possible.
-                // Since we don't have direct access here easily, let's use the loaded assets based on wave logic approximation or add a type property.
-                // For now, let's just cycle or pick one based on wave.
-                const wave = engineState.currentWaveNumber;
-                const bossIndex = Math.floor((wave - 1) / 3) % 3; // 0, 1, 2
-                if (bossIndex === 0) enemyImg = GAME_ASSETS.BOSS_SLIME;
-                else if (bossIndex === 1) enemyImg = GAME_ASSETS.BOSS_SHADOW;
-                else enemyImg = GAME_ASSETS.BOSS_GOLEM;
-
-            } else if (tierId === 'TANK') enemyImg = GAME_ASSETS.ENEMY_TANK;
-            else if (tierId === 'ROGUE') enemyImg = GAME_ASSETS.ENEMY_ROGUE;
-            else if (tierId === 'SWARM') enemyImg = GAME_ASSETS.ENEMY_SWARM;
-            else if (tierId === 'MAGIC') enemyImg = GAME_ASSETS.ENEMY_MAGIC;
-            else if (tierId === 'RARE') enemyImg = GAME_ASSETS.ENEMY_RARE;
-            else if (tierId === 'AEGIS') enemyImg = GAME_ASSETS.ENEMY_AEGIS;
-            else enemyImg = GAME_ASSETS.ENEMY_NORMAL;
-
-            if (enemyImg) {
-                context.shadowBlur = 15;
-                context.shadowColor = this.tier.color;
-
-                // Rotation for some types
-                const saveAngle = this.rotation || 0;
-                // Rogue/Swarm might want to face direction? 
-                // Currently they just move down mostly. Rogue moves angled.
-
-                const drawSize = this.size * 1.5; // Slightly larger for sprites
-                context.drawImage(enemyImg, this.positionX - drawSize / 2, this.positionY - drawSize / 2, drawSize, drawSize);
-                context.shadowBlur = 0;
-            } else if (this.tier.id !== 'AEGIS') {
-                // Fallback: Legacy Shape Drawing
-                context.shadowBlur = 10;
-                context.shadowColor = this.tier.color;
-                context.beginPath();
-
-                // ... (Copy existing shape logic if needed, or just circle fallback)
-                context.arc(this.positionX, this.positionY, halfSize, 0, Math.PI * 2);
-                context.fill();
-            }
-
-            // 4. Inner Details (Eyes/Core)
-            context.fillStyle = "rgba(0,0,0,0.5)";
-            context.beginPath();
-            if (this.tier.id === 'ROGUE') {
-                context.arc(this.positionX, this.positionY - 5, 4, 0, Math.PI * 2);
-            } else {
-                context.arc(this.positionX, this.positionY, 4, 0, Math.PI * 2);
-            }
-            context.fill();
-
-            // 5. Status Icons
-            if (this.confusionTimer > 0) {
-                context.fillStyle = "#fff";
-                context.font = "bold 14px Arial";
-                context.fillText("?", this.positionX + halfSize, this.positionY - halfSize);
-            }
-            if (this.poisonStacks > 0) {
-                context.fillStyle = "#8e44ad";
-                context.font = "10px Arial";
-                context.fillText(`${this.poisonStacks}`, this.positionX, this.positionY + 5);
-            }
-
-            // 6. Health Bar & Numeric HP Display (Strategic Placement)
-            context.shadowBlur = 0;
-            const isBoss = this.tier.id === 'BOSS';
-            const hpBarW = isBoss ? 100 : 40;
-            const hpBarH = isBoss ? 8 : 4;
-
-            // 描画位置の決定: ボスは下、ザコは上
-            const hpY = isBoss ? (this.positionY + halfSize + 15) : (this.positionY - halfSize - 15);
-
-            // 背景（黒枠）
-            context.fillStyle = "rgba(0, 0, 0, 0.8)";
-            context.fillRect(this.positionX - hpBarW / 2 - 1, hpY - 1, hpBarW + 2, hpBarH + 2);
-
-            // バー本体
-            context.fillStyle = "#222";
-            context.fillRect(this.positionX - hpBarW / 2, hpY, hpBarW, hpBarH);
-
-            const hpColor = this.freezeTimer > 0 ? "#74b9ff" : (isBoss ? "#ff3f34" : "#2ecc71");
-            context.fillStyle = hpColor;
-            const healthRatio = Math.max(0, this.health / this.maxHealth);
-            context.fillRect(this.positionX - hpBarW / 2, hpY, hpBarW * healthRatio, hpBarH);
-
-            // ボスの場合、体の中央に残りHP数値を表示
-            if (isBoss) {
-                context.font = "bold 16px 'Consolas', 'Monaco', monospace"; // デジタル感のあるフォント
-                context.textAlign = "center";
-                context.textBaseline = "middle";
-                const displayHp = Math.ceil(this.health).toLocaleString();
-
-                // 視認性のためのドロップシャドウ/縁取り
-                context.strokeStyle = "#000";
-                context.lineWidth = 4;
-                context.strokeText(displayHp, this.positionX, this.positionY);
-
-                // ネオンカラーの数値
-                context.fillStyle = "#fff";
-                context.fillText(displayHp, this.positionX, this.positionY);
-
-                // ボス名を表示 (バーのすぐ下)
-                context.font = "bold 10px sans-serif";
-                context.fillStyle = "#aaa";
-                context.fillText(this.tier.name, this.positionX, hpY + hpBarH + 10);
-            }
-
-            // [Patch] Aegis Barrier Overlay
-            if (this.tier.id === 'AEGIS' && this.isBarrierActive) {
-                context.shadowBlur = 10;
-                context.shadowColor = "#00d2d3";
-                context.strokeStyle = `rgba(0, 210, 211, ${0.6 + Math.sin(Date.now() / 200) * 0.4})`;
-                context.lineWidth = 6;
-                context.beginPath();
-                // Draw Horizontal Barrier (Wall) in front
-                // Full Screen Width (End to End)
-                const barWidth = GAME_SETTINGS.SCREEN_WIDTH;
-                context.moveTo(this.positionX - barWidth / 2, this.positionY + 40);
-                context.lineTo(this.positionX + barWidth / 2, this.positionY + 40);
-                context.stroke();
-
-                // Draw Shield HP
-                context.fillStyle = "#fff";
-                context.font = "bold 20px sans-serif";
-                context.textAlign = "center";
-                context.fillText(`🛡️${this.barrierHp}`, this.positionX, this.positionY - this.size - 10);
-                context.shadowBlur = 0;
-            }
-
-            context.restore();
-        }
     }
 }
+
+draw(context) {
+    context.save();
+
+    if (this.isDying) {
+        // 徐々に透明にし、小さくする
+        context.globalAlpha = Math.max(0, 1.0 - this.deathProgress);
+        const deathScale = 1.0 - (this.deathProgress * 0.4);
+        context.translate(this.positionX, this.positionY);
+        context.scale(deathScale, deathScale);
+        context.translate(-this.positionX, -this.positionY);
+    }
+
+    // 1. Target Marker
+    if (engineState.manualTargetId === this.id) {
+        context.strokeStyle = EFFECT_CONSTANTS.COLOR_TARGET;
+        context.lineWidth = 2;
+        context.beginPath();
+        context.arc(this.positionX, this.positionY, this.size * 0.8, 0, Math.PI * 2);
+        context.stroke();
+    }
+
+    // 2. Determine Color based on Status
+    if (this.flashTime > 0) context.fillStyle = "#ffffff";
+    else if (this.confusionTimer > 0) context.fillStyle = "#e056fd";
+    else if (this.freezeTimer > 0) context.fillStyle = EFFECT_CONSTANTS.COLOR_FREEZE;
+    else if (this.stunTimer > 0) context.fillStyle = "#7f8c8d";
+    else if (this.burnTimer > 0) context.fillStyle = EFFECT_CONSTANTS.COLOR_BURN;
+    else if (this.poisonTimer > 0) context.fillStyle = "#8e44ad";
+    else if (this.soakedTimer > 0) context.fillStyle = "#3498db";
+    else if (this.shockTimer > 0) context.fillStyle = "#f1c40f";
+    else if (this.leechTimer > 0) context.fillStyle = "#2ecc71";
+    else context.fillStyle = this.tier.color;
+
+    const drawSize = this.size;
+    const halfSize = drawSize / 2;
+
+    // 3. Draw Enemy Image (New)
+    let enemyImg = null;
+    const tierId = this.tier.id;
+
+    if (tierId === 'BOSS') {
+        // Determine Boss Type Logic (Simple matching by name or wave, assuming Boss Name is set)
+        // Currently EnemyUnit doesn't hold 'name' directly from config unless passed, 
+        // but we can infer or if BOSS_WAVES logic attached name to this.tier
+        // However, BOSS_WAVES config is used to spawn. Let's check tier name?
+        // Actually, `this.tier` is a reference to ENEMY_TIERS object.
+
+        // Note: Bosses are spawned with currentWaveNumber Check in main logic.
+        // Let's rely on specific boss tracking or just Cycle:
+        // Wave 1-3: Slime, 4-6: Shadow, 7+: Golem?
+        // Or simpler: Check the level/wave when spawned.
+
+        // Current simple logic:
+        if (engineState.currentWaveNumber % 10 === 0 && engineState.currentWaveNumber >= 10) enemyImg = GAME_ASSETS.BOSS_GOLEM;
+        else if (engineState.currentWaveNumber >= 5) enemyImg = GAME_ASSETS.BOSS_SHADOW; // Late game standard boss
+        else enemyImg = GAME_ASSETS.BOSS_SLIME; // Early boss
+
+        // To be precise: match the BOSS_WAVES config if possible.
+        // Since we don't have direct access here easily, let's use the loaded assets based on wave logic approximation or add a type property.
+        // For now, let's just cycle or pick one based on wave.
+        const wave = engineState.currentWaveNumber;
+        const bossIndex = Math.floor((wave - 1) / 3) % 3; // 0, 1, 2
+        if (bossIndex === 0) enemyImg = GAME_ASSETS.BOSS_SLIME;
+        else if (bossIndex === 1) enemyImg = GAME_ASSETS.BOSS_SHADOW;
+        else enemyImg = GAME_ASSETS.BOSS_GOLEM;
+
+    } else if (tierId === 'TANK') enemyImg = GAME_ASSETS.ENEMY_TANK;
+    else if (tierId === 'ROGUE') enemyImg = GAME_ASSETS.ENEMY_ROGUE;
+    else if (tierId === 'SWARM') enemyImg = GAME_ASSETS.ENEMY_SWARM;
+    else if (tierId === 'MAGIC') enemyImg = GAME_ASSETS.ENEMY_MAGIC;
+    else if (tierId === 'RARE') enemyImg = GAME_ASSETS.ENEMY_RARE;
+    else if (tierId === 'AEGIS') enemyImg = GAME_ASSETS.ENEMY_AEGIS;
+    else enemyImg = GAME_ASSETS.ENEMY_NORMAL;
+
+    if (enemyImg) {
+        context.shadowBlur = 15;
+        context.shadowColor = this.tier.color;
+
+        // Rotation for some types
+        const saveAngle = this.rotation || 0;
+        // Rogue/Swarm might want to face direction? 
+        // Currently they just move down mostly. Rogue moves angled.
+
+        const drawSize = this.size * 1.5; // Slightly larger for sprites
+        context.drawImage(enemyImg, this.positionX - drawSize / 2, this.positionY - drawSize / 2, drawSize, drawSize);
+        context.shadowBlur = 0;
+    } else if (this.tier.id !== 'AEGIS') {
+        // Fallback: Legacy Shape Drawing
+        context.shadowBlur = 10;
+        context.shadowColor = this.tier.color;
+        context.beginPath();
+
+        // ... (Copy existing shape logic if needed, or just circle fallback)
+        context.arc(this.positionX, this.positionY, halfSize, 0, Math.PI * 2);
+        context.fill();
+    }
+
+    // 4. Inner Details (Eyes/Core)
+    context.fillStyle = "rgba(0,0,0,0.5)";
+    context.beginPath();
+    if (this.tier.id === 'ROGUE') {
+        context.arc(this.positionX, this.positionY - 5, 4, 0, Math.PI * 2);
+    } else {
+        context.arc(this.positionX, this.positionY, 4, 0, Math.PI * 2);
+    }
+    context.fill();
+
+    // 5. Status Icons
+    if (this.confusionTimer > 0) {
+        context.fillStyle = "#fff";
+        context.font = "bold 14px Arial";
+        context.fillText("?", this.positionX + halfSize, this.positionY - halfSize);
+    }
+    if (this.poisonStacks > 0) {
+        context.fillStyle = "#8e44ad";
+        context.font = "10px Arial";
+        context.fillText(`${this.poisonStacks}`, this.positionX, this.positionY + 5);
+    }
+
+    // 6. Health Bar & Numeric HP Display (Strategic Placement)
+    context.shadowBlur = 0;
+    const isBoss = this.tier.id === 'BOSS';
+    const hpBarW = isBoss ? 100 : 40;
+    const hpBarH = isBoss ? 8 : 4;
+
+    // 描画位置の決定: ボスは下、ザコは上
+    const hpY = isBoss ? (this.positionY + halfSize + 15) : (this.positionY - halfSize - 15);
+
+    // 背景（黒枠）
+    context.fillStyle = "rgba(0, 0, 0, 0.8)";
+    context.fillRect(this.positionX - hpBarW / 2 - 1, hpY - 1, hpBarW + 2, hpBarH + 2);
+
+    // バー本体
+    context.fillStyle = "#222";
+    context.fillRect(this.positionX - hpBarW / 2, hpY, hpBarW, hpBarH);
+
+    const hpColor = this.freezeTimer > 0 ? "#74b9ff" : (isBoss ? "#ff3f34" : "#2ecc71");
+    context.fillStyle = hpColor;
+    const healthRatio = Math.max(0, this.health / this.maxHealth);
+    context.fillRect(this.positionX - hpBarW / 2, hpY, hpBarW * healthRatio, hpBarH);
+
+    // ボスの場合、体の中央に残りHP数値を表示
+    if (isBoss) {
+        context.font = "bold 16px 'Consolas', 'Monaco', monospace"; // デジタル感のあるフォント
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        const displayHp = Math.ceil(this.health).toLocaleString();
+
+        // 視認性のためのドロップシャドウ/縁取り
+        context.strokeStyle = "#000";
+        context.lineWidth = 4;
+        context.strokeText(displayHp, this.positionX, this.positionY);
+
+        // ネオンカラーの数値
+        context.fillStyle = "#fff";
+        context.fillText(displayHp, this.positionX, this.positionY);
+
+        // ボス名を表示 (バーのすぐ下)
+        context.font = "bold 10px sans-serif";
+        context.fillStyle = "#aaa";
+        context.fillText(this.tier.name, this.positionX, hpY + hpBarH + 10);
+    }
+
+    // [Patch] Aegis Barrier Overlay
+    if (this.tier.id === 'AEGIS' && this.isBarrierActive) {
+        context.shadowBlur = 10;
+        context.shadowColor = "#00d2d3";
+        context.strokeStyle = `rgba(0, 210, 211, ${0.6 + Math.sin(Date.now() / 200) * 0.4})`;
+        context.lineWidth = 6;
+        context.beginPath();
+        // Draw Horizontal Barrier (Wall) in front
+        // Full Screen Width (End to End)
+        const barWidth = GAME_SETTINGS.SCREEN_WIDTH;
+        context.moveTo(this.positionX - barWidth / 2, this.positionY + 40);
+        context.lineTo(this.positionX + barWidth / 2, this.positionY + 40);
+        context.stroke();
+
+        // Draw Shield HP
+        context.fillStyle = "#fff";
+        context.font = "bold 20px sans-serif";
+        context.textAlign = "center";
+        context.fillText(`🛡️${this.barrierHp}`, this.positionX, this.positionY - this.size - 10);
+        context.shadowBlur = 0;
+    }
+
+    context.restore();
+}
+    }
+}
+
 
 
 class ZoneEffect {
