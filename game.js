@@ -4292,10 +4292,60 @@ function displayGameOver() {
     gameContext.font = "bold 40px 'Hiragino Kaku Gothic Pro', sans-serif";
     gameContext.textAlign = "center";
     gameContext.fillText("通信途絶 (ゲームオーバー)", gameCanvas.width / 2, gameCanvas.height / 2);
-    gameContext.font = "20px sans-serif";
+
+    // Draw retry button (touchscreen friendly)
+    const btnX = gameCanvas.width / 2 - 100;
+    const btnY = gameCanvas.height / 2 + 30;
+    const btnWidth = 200;
+    const btnHeight = 50;
+
+    gameContext.fillStyle = "#e74c3c";
+    gameContext.fillRect(btnX, btnY, btnWidth, btnHeight);
+    gameContext.strokeStyle = "#fff";
+    gameContext.lineWidth = 2;
+    gameContext.strokeRect(btnX, btnY, btnWidth, btnHeight);
+
+    gameContext.font = "bold 20px sans-serif";
     gameContext.fillStyle = "#fff";
-    gameContext.fillText("[R]キー でリトライ", gameCanvas.width / 2, gameCanvas.height / 2 + 50);
+    gameContext.fillText("🔄 RETRY", gameCanvas.width / 2, btnY + 32);
+
+    gameContext.font = "12px sans-serif";
+    gameContext.fillStyle = "#aaa";
+    gameContext.fillText("(タップ または [R]キー)", gameCanvas.width / 2, btnY + btnHeight + 20);
+
     gameContext.restore();
+
+    // Add click listener for retry button (one-time)
+    if (!window._retryClickListener) {
+        window._retryClickListener = function (e) {
+            if (!engineState.isGameOver) return;
+
+            const rect = gameCanvas.getBoundingClientRect();
+            const scaleX = gameCanvas.width / rect.width;
+            const scaleY = gameCanvas.height / rect.height;
+
+            // Get click coordinates (handle both mouse and touch)
+            let clientX, clientY;
+            if (e.type.startsWith('touch')) {
+                clientX = e.touches[0]?.clientX || e.changedTouches[0]?.clientX;
+                clientY = e.touches[0]?.clientY || e.changedTouches[0]?.clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            const x = (clientX - rect.left) * scaleX;
+            const y = (clientY - rect.top) * scaleY;
+
+            // Check if click is within button bounds
+            if (x >= btnX && x <= btnX + btnWidth && y >= btnY && y <= btnY + btnHeight) {
+                restartGame();
+            }
+        };
+
+        gameCanvas.addEventListener('click', window._retryClickListener);
+        gameCanvas.addEventListener('touchend', window._retryClickListener);
+    }
 }
 
 function addExperience(value) {
