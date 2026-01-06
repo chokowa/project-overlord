@@ -138,6 +138,7 @@ class GameEngine {
         this.isBeamActive = false; // [Hardcore] Continuous beam active
         this.beamDrainRate = 2.25; // Heat consumed per frame during beam (1.5x increase for shorter duration)
         this.activeBeam = null; // Object pooling: reuse beam instance
+        this.beamLockedTarget = null; // Locked target during beam to prevent flickering
 
         // [Hardcore] Overdrive System
         this.isOverdrive = false; // 1.2x damage, heat locked at max
@@ -1021,13 +1022,27 @@ Object.assign(GameEngine.prototype, {
             const isCritical = heatRatio >= 0.9;
             const blastColor = isCritical ? "#ff6b6b" : "#f39c12";
 
-            // Determine beam direction
+            // Determine beam direction using locked target (prevents flickering)
             let beamAngle;
-            const target = getTarget();
-            if (target) {
-                beamAngle = Math.atan2(target.positionY - RENDER_CONSTANTS.TURRET_POS_Y, target.positionX - RENDER_CONSTANTS.TURRET_POS_X);
+
+            // Use locked target, or get new one if target is dead
+            if (this.beamLockedTarget && this.beamLockedTarget.isActive) {
+                // Track locked target
+                beamAngle = Math.atan2(
+                    this.beamLockedTarget.positionY - RENDER_CONSTANTS.TURRET_POS_Y,
+                    this.beamLockedTarget.positionX - RENDER_CONSTANTS.TURRET_POS_X
+                );
             } else {
-                beamAngle = -Math.PI / 2;
+                // Target is dead or doesn't exist, get new target
+                this.beamLockedTarget = getTarget();
+                if (this.beamLockedTarget) {
+                    beamAngle = Math.atan2(
+                        this.beamLockedTarget.positionY - RENDER_CONSTANTS.TURRET_POS_Y,
+                        this.beamLockedTarget.positionX - RENDER_CONSTANTS.TURRET_POS_X
+                    );
+                } else {
+                    beamAngle = -Math.PI / 2; // Default: straight up
+                }
             }
 
             // Object pooling: Reuse beam instance instead of creating new one every frame
@@ -1090,6 +1105,7 @@ Object.assign(GameEngine.prototype, {
             // Turn off beam
             this.isBeamActive = false;
             this.activeBeam = null; // Clear beam instance for cleanup
+            this.beamLockedTarget = null; // Release target lock
             activeFloatingTexts.push(new FloatingText(RENDER_CONSTANTS.TURRET_POS_X, GAME_SETTINGS.CASTLE_Y - 80, "BEAM OFF", "#66fcf1", 18));
         } else {
             // Try to turn on beam
