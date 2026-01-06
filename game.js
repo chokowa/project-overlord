@@ -1128,8 +1128,17 @@ Object.assign(GameEngine.prototype, {
             let enemiesHit = 0;
 
             // Damage enemies in beam
+            // [Patch] Check for Aegis barrier
+            const activeAegis = activeEnemies.find(e => e.isActive && e.tier.id === 'AEGIS' && e.isBarrierActive);
+            const barrierY = activeAegis ? activeAegis.positionY + 50 : null;
+
             activeEnemies.forEach(enemy => {
                 if (!enemy.isActive) return;
+
+                // Skip enemies behind Aegis barrier
+                if (barrierY !== null && enemy.positionY < barrierY) {
+                    return;
+                }
 
                 enemiesChecked++;
 
