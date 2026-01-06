@@ -1032,7 +1032,7 @@ Object.assign(GameEngine.prototype, {
 
             // Object pooling: Reuse beam instance instead of creating new one every frame
             if (!this.activeBeam) {
-                // Create beam on first use
+                // Create beam on first use (not added to activeZoneEffects)
                 this.activeBeam = new BeamEffect(
                     RENDER_CONSTANTS.TURRET_POS_X,
                     RENDER_CONSTANTS.TURRET_POS_Y,
@@ -1042,7 +1042,7 @@ Object.assign(GameEngine.prototype, {
                     blastColor,
                     isCritical
                 );
-                activeZoneEffects.push(this.activeBeam);
+                // Removed: activeZoneEffects.push(this.activeBeam);
             } else {
                 // Update existing beam parameters
                 this.activeBeam.updateBeam(beamAngle, beamWidth, beamLength, blastColor, isCritical);
@@ -4167,6 +4167,12 @@ function renderScene() {
 
     engineState.activeDrops.forEach(drop => drop.draw(gameContext));
     activeZoneEffects.forEach(zone => zone.draw(gameContext));
+
+    // Draw BeamEffect separately (not in activeZoneEffects)
+    if (engineState.activeBeam && engineState.isBeamActive) {
+        engineState.activeBeam.draw(gameContext);
+    }
+
     engineState.activeSupportUnits.forEach(unit => unit.draw(gameContext));
     activeEnemies.forEach(enemy => enemy.draw(gameContext));
     activeProjectiles.forEach(projectile => projectile.draw(gameContext));

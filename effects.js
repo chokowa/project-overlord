@@ -196,12 +196,12 @@ export class BeamEffect {
         this.length = length;
         this.color = color;
         this.isCritical = isCritical;
-        this.life = 1.0; // Reset life for continuous beam
-        this.expandProgress = 1.0; // Keep fully expanded
+        // Removed: this.life = 1.0; - Let life stay at 1.0 for continuous beam
+        // Removed: this.expandProgress = 1.0; - Already at 1.0 from constructor
     }
 
     update() {
-        this.life -= this.fadeSpeed;
+        // Removed: this.life -= this.fadeSpeed; - Keep life at 1.0 for continuous beam
         this.expandProgress = Math.min(1, this.expandProgress + 0.15);
     }
 
