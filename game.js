@@ -2786,6 +2786,46 @@ class EnemyUnit {
             }
         }
 
+        // [Patch] Aegis Barrier Logic
+        if (this.tier.id === 'AEGIS' && this.isBarrierActive) {
+            // Only reflected shots can damage the barrier
+            if (sourceId === 'reflected') {
+                this.barrierHp--;
+                activeFloatingTexts.push(new FloatingText(
+                    this.positionX, this.positionY - 40,
+                    "CRACK!", "#00d2d3", 30
+                ));
+                triggerScreenShake(5, 5);
+
+                if (this.barrierHp <= 0) {
+                    this.isBarrierActive = false;
+                    this.stunTimer = 180; // 3 seconds stun
+                    activeFloatingTexts.push(new FloatingText(
+                        this.positionX, this.positionY - 60,
+                        "SHATTERED!", "#fff", 40
+                    ));
+                    if (typeof createIceShatter === 'function') {
+                        createIceShatter(this.positionX, this.positionY, 100);
+                    }
+                }
+                return; // No HP damage from barrier hit
+            } else if (sourceId !== 'burn_dot' && sourceId !== 'poison_dot' &&
+                sourceId !== 'leech_dot' && sourceId !== 'meltdown' &&
+                sourceId !== 'corrosion' && sourceId !== 'plague' &&
+                sourceId !== 'glacier' && sourceId !== 'betrayal') {
+                // Block all non-DoT/non-Synergy attacks
+                activeFloatingTexts.push(new FloatingText(
+                    this.positionX, this.positionY - 30,
+                    "GUARD", "#00d2d3", 20
+                ));
+                activeParticles.push(new ParticleEffect(
+                    this.positionX, this.positionY + 20, "#00d2d3", 4
+                ));
+                return; // 0 Damage
+            }
+            // DoT and Synergy attacks bypass barrier and continue to damage calculation
+        }
+
         // Apply Status Multipliers
         // Dr. Xeno: Shock Multiplier
         if (this.shockTimer > 0) {
