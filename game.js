@@ -3749,7 +3749,7 @@ function mainLoop() {
         if (delta >= 1000) {
             const fps = Math.round((window._fpsTracker.frameCount / delta) * 1000);
             const ups = Math.round((window._fpsTracker.updateCount / delta) * 1000);
-            console.log(`[FPS During Heat Blast] ${fps} fps | ${ups} UPS (updates/sec) | Frame time: ${(delta / window._fpsTracker.frameCount).toFixed(2)}ms | timeScale: ${engineState.timeScale} | isPaused: ${engineState.isPaused}`);
+            console.log(`[FPS During Heat Blast] ${fps} fps | ${ups} UPS | timeScale: ${engineState.timeScale} | isPaused: ${engineState.isPaused} | hitStopFrames: ${engineState.hitStopFrames}`);
             window._fpsTracker.lastTime = now;
             window._fpsTracker.frameCount = 0;
             window._fpsTracker.updateCount = 0;
