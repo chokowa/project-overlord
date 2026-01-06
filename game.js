@@ -4315,37 +4315,43 @@ function displayGameOver() {
 
     gameContext.restore();
 
-    // Add click listener for retry button (one-time)
-    if (!window._retryClickListener) {
-        window._retryClickListener = function (e) {
-            if (!engineState.isGameOver) return;
-
-            const rect = gameCanvas.getBoundingClientRect();
-            const scaleX = gameCanvas.width / rect.width;
-            const scaleY = gameCanvas.height / rect.height;
-
-            // Get click coordinates (handle both mouse and touch)
-            let clientX, clientY;
-            if (e.type.startsWith('touch')) {
-                clientX = e.touches[0]?.clientX || e.changedTouches[0]?.clientX;
-                clientY = e.touches[0]?.clientY || e.changedTouches[0]?.clientY;
-            } else {
-                clientX = e.clientX;
-                clientY = e.clientY;
-            }
-
-            const x = (clientX - rect.left) * scaleX;
-            const y = (clientY - rect.top) * scaleY;
-
-            // Check if click is within button bounds
-            if (x >= btnX && x <= btnX + btnWidth && y >= btnY && y <= btnY + btnHeight) {
-                restartGame();
-            }
-        };
-
-        gameCanvas.addEventListener('click', window._retryClickListener);
-        gameCanvas.addEventListener('touchend', window._retryClickListener);
+    // Remove old listener if exists
+    if (window._retryClickListener) {
+        gameCanvas.removeEventListener('click', window._retryClickListener);
+        gameCanvas.removeEventListener('touchend', window._retryClickListener);
     }
+
+    // Add click listener with closure capturing button coordinates
+    window._retryClickListener = function (e) {
+        if (!engineState.isGameOver) return;
+
+        const rect = gameCanvas.getBoundingClientRect();
+        const scaleX = gameCanvas.width / rect.width;
+        const scaleY = gameCanvas.height / rect.height;
+
+        // Get click coordinates (handle both mouse and touch)
+        let clientX, clientY;
+        if (e.type.startsWith('touch')) {
+            const touch = e.touches[0] || e.changedTouches[0];
+            if (!touch) return;
+            clientX = touch.clientX;
+            clientY = touch.clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+
+        const x = (clientX - rect.left) * scaleX;
+        const y = (clientY - rect.top) * scaleY;
+
+        // Check if click is within button bounds (using closure-captured coordinates)
+        if (x >= btnX && x <= btnX + btnWidth && y >= btnY && y <= btnY + btnHeight) {
+            restartGame();
+        }
+    };
+
+    gameCanvas.addEventListener('click', window._retryClickListener);
+    gameCanvas.addEventListener('touchend', window._retryClickListener);
 }
 
 function addExperience(value) {
