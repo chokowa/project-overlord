@@ -3744,7 +3744,7 @@ function mainLoop() {
         // Log every second
         if (delta >= 1000) {
             const fps = Math.round((window._fpsTracker.frameCount / delta) * 1000);
-            console.log(`[FPS During Heat Blast] ${fps} fps | Frame time: ${(delta / window._fpsTracker.frameCount).toFixed(2)}ms`);
+            console.log(`[FPS During Heat Blast] ${fps} fps | Frame time: ${(delta / window._fpsTracker.frameCount).toFixed(2)}ms | timeScale: ${engineState.timeScale} | accumulator: ${engineState.accumulator.toFixed(2)}`);
             window._fpsTracker.lastTime = now;
             window._fpsTracker.frameCount = 0;
         }
