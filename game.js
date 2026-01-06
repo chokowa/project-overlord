@@ -1102,7 +1102,7 @@ Object.assign(GameEngine.prototype, {
                 if (rotatedX > 0 && rotatedX < beamLength && Math.abs(rotatedY) < beamWidth / 2) {
                     const centerDist = Math.abs(rotatedY) / (beamWidth / 2);
                     const actualDamage = damage * (1 - centerDist * 0.3);
-                    enemy.takeDamage(actualDamage, 'heat_blast', this);
+                    enemy.takeDamage(actualDamage, isCritical, 'heat_blast');
                     enemiesHit++;
 
                     if (isCritical && Math.random() < 0.05) {
@@ -2641,7 +2641,7 @@ class EnemyUnit {
         this.flashTime = 5;
 
         // クリティカル時にヒットストップを発動 (約0.05秒)
-        if (isCritical) {
+        if (isCritical && sourceId !== 'heat_blast') {
             engineState.hitStopFrames = 3;
         }
 
