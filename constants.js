@@ -63,12 +63,16 @@ export const GEM_TYPES = {
     SUPPORT: 'SUPPORT'
 };
 
+// 装備スロット名（ゲーム内UI表示）
+// - ゲーム内では「パーツ」「ギア」と表示
+// - コード上では ARTIFACT_TYPES.PARTS / ARTIFACT_TYPES.GEAR
 export const ARTIFACT_TYPES = {
-    PARTS: 'PARTS',
-    GEAR: 'GEAR',
+    PARTS: 'PARTS',  // ゲーム内UI: "パーツ"
+    GEAR: 'GEAR',      // ゲーム内UI: "ギア"
     BOSS: 'BOSS_ARTIFACT' // New type
 };
 
+// ボスドロップ専用アイテム（ゲーム内で「アーティファクト」と呼ぶのはこれらのみ）
 export const BOSS_ARTIFACTS = {
     // A. Standard Stats
     BERSERKER_HELM: { id: 'berserker_helm', name: '狂戦士の兜', icon: '⛑️', desc: 'HP減少率に応じて攻撃力UP (最大+50%)', type: 'BOSS_ARTIFACT', color: '#c0392b', config: { max_bonus: 0.5 } },
@@ -238,7 +242,10 @@ export const GEMS = {
     }
 };
 
+// パーツ/ギアスロット装備品（コード上の名前は ARTIFACTS だがゲーム内では「アーティファクト」とは呼ばない）
+// ゲーム内では装備スロット名（パーツ/ギア）で区別される
 export const ARTIFACTS = {
+    // 【削除予定】以下の4アイテムは将来削除される
     RUBY_RING: {
         id: 'ruby_ring', name: '赤の指輪', type: ARTIFACT_TYPES.PARTS,
         color: '#c0392b', description: "ダメージ +15%",
@@ -259,7 +266,7 @@ export const ARTIFACTS = {
         color: '#f39c12', description: "XP獲得量 +20%",
         stats: { xp_gain: 0.20 }
     },
-    // --- PARTS (Physical Enhancements) ---
+    // --- PARTS（パーツスロット装備品）---
     HIGH_CAPACITY: {
         id: 'high_capacity', name: '大容量コンデンサ', type: ARTIFACT_TYPES.PARTS,
         color: '#f39c12', description: "ヒート効率 +30%",
@@ -271,7 +278,7 @@ export const ARTIFACTS = {
         stats: { predictive_aim: 1 }
     },
 
-    // --- GEAR (Tactical/Digital Enhancements) ---
+    // --- GEAR（ギアスロット装備品）---
     HEADBAND: {
         id: 'headband', name: '気合ハチマキ', type: ARTIFACT_TYPES.GEAR,
         color: '#e74c3c', description: "強敵(MaxHP)優先",
