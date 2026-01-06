@@ -3023,8 +3023,8 @@ class EnemyProjectile {
             if (this.y < -50) this.isAlive = false;
             for (const enemy of activeEnemies) {
                 if (!enemy.isActive) continue;
-                // [Patch] Reflected bullets IGNORE non-Aegis enemies
-                if (enemy.tier.id !== 'AEGIS') continue;
+                // [Patch] Reflected bullets hit BOSS and AEGIS enemies
+                if (enemy.tier.id !== 'AEGIS' && enemy.tier.id !== 'BOSS') continue;
 
                 const dist = Math.hypot(enemy.positionX - this.x, enemy.positionY - this.y);
                 if (dist < enemy.size + this.size) {
