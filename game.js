@@ -38,49 +38,11 @@ class DropItem {
         this.itemTemplate = itemTemplate;
         this.floatTimer = Math.random() * Math.PI * 2;
         this.creationTime = Date.now();
-        this.isActive = true;
     }
 
     update() {
-        if (!this.isActive) return;
-
-        // FukaPay / Auto Collect Logic
-        if (engineState.stats.auto_collect > 0) {
-            const tx = RENDER_CONSTANTS.TURRET_POS_X;
-            const ty = RENDER_CONSTANTS.TURRET_POS_Y;
-            const dx = tx - this.x;
-            const dy = ty - this.y;
-            const dist = Math.hypot(dx, dy);
-
-            if (dist < 20) {
-                // Auto-loot range
-                if (this.itemTemplate.type === 'GOLD') {
-                    let val = (GAME_SETTINGS.GOLD_VALUE_BASE || 25) + Math.floor(Math.random() * 10);
-                    if (engineState.stats.gold_gain > 0) val = Math.floor(val * (1 + engineState.stats.gold_gain));
-                    engineState.gold += val;
-                    activeFloatingTexts.push(new FloatingText(this.x, this.y, `+${val} G`, "#f1c40f", 20));
-                    refreshInventoryInterface();
-                } else {
-                    engineState.addItemToInventory(this.itemTemplate);
-                    activeFloatingTexts.push(new FloatingText(this.x, this.y, "GET!", "#f1c40f", 20));
-                }
-                this.isActive = false;
-                return;
-            } else {
-                // Fly towards turret
-                const speed = 15;
-                this.x += (dx / dist) * speed;
-                this.y += (dy / dist) * speed;
-            }
-        }
-
-        this.floatTimer += 0.05;
-        this.y = this.baseY + Math.sin(this.floatTimer) * GAME_SETTINGS.DROP_FLOAT_RANGE;
-
-        // Auto-remove logic (time based)
-        if (Date.now() - this.creationTime > 30000) { // 30s
-            this.isActive = false;
-        }
+        this.floatTimer += RENDER_CONSTANTS.DROP_FLOAT_SPEED;
+        this.y = this.baseY + Math.sin(this.floatTimer) * RENDER_CONSTANTS.DROP_FLOAT_RANGE;
     }
 
     draw(context) {
@@ -108,8 +70,9 @@ class DropItem {
         let icon = "?";
         if (this.itemTemplate.type === GEM_TYPES.ACTIVE) icon = "⚔️";
         else if (this.itemTemplate.type === GEM_TYPES.SUPPORT) icon = "💠";
-        else if (this.itemTemplate.type === ARTIFACT_TYPES.RING) icon = "💍";
-        else if (this.itemTemplate.type === ARTIFACT_TYPES.AMULET) icon = "🧿";
+        else if (this.itemTemplate.type === ARTIFACT_TYPES.PARTS) icon = "🔌";
+        else if (this.itemTemplate.type === ARTIFACT_TYPES.GEAR) icon = "⚙️";
+        else if (this.itemTemplate.type === ARTIFACT_TYPES.BOSS) icon = "👑";
         else if (this.itemTemplate.type === 'GOLD') icon = "💰";
 
         context.fillText(icon, 0, 1);
@@ -141,8 +104,8 @@ class GameEngine {
         this.currentLoadoutId = 1;
         /** @type {Object} */
         this.equippedArtifacts = {
-            [ARTIFACT_TYPES.RING]: null,
-            [ARTIFACT_TYPES.AMULET]: null
+            [ARTIFACT_TYPES.PARTS]: null,
+            [ARTIFACT_TYPES.GEAR]: null
         };
         this.inventory = [];
         this.activeDrops = [];
@@ -271,8 +234,8 @@ class GameEngine {
         this.altGems = [null, null, null];
         this.currentLoadoutId = 1;
         this.equippedArtifacts = {
-            [ARTIFACT_TYPES.RING]: null,
-            [ARTIFACT_TYPES.AMULET]: null
+            [ARTIFACT_TYPES.PARTS]: null,
+            [ARTIFACT_TYPES.GEAR]: null
         };
         this.inventory = [];
         this.activeDrops = [];
@@ -289,31 +252,26 @@ class GameEngine {
         if (btn) btn.innerHTML = "▶️ x1.0";
     }
 
+    addXp(amount) {
+        // Wrapper for global addExperience function if it exists, or direct logic
+        if (typeof addExperience === 'function') {
+            addExperience(amount);
+        } else {
+            this.experiencePoints += amount;
+            // Basic fallback level up check if global function missing
+            if (typeof checkLevelUp === 'function') checkLevelUp();
+        }
+    }
+
     /** スキルツリーのステータス再計算 (Rank System対応) */
     recalcStats() {
-        // Initialize Base Stats
         this.stats = {
-            damage_pct: 0,
-            rate_pct: 0,
-            crit_chance: GAME_SETTINGS.BASE_CRIT_CHANCE || 0.05,
-            crit_damage: GAME_SETTINGS.BASE_CRIT_MULTIPLIER || 1.5,
-            hp_max: 0,
-            hp_regen: 0,
-            xp_gain: 0,
-            gold_gain: 0,
-            life_on_hit: 0,
-            damage_reduction: 0,
-            aoe_pct: 0,
-            proj_speed_pct: 0,
-            chain_range_pct: 0,
-            final_damage_mul: 1.0,
-            hit_damage_mul_pct: 0,
-            dot_power_pct: 0,
-            // New Item Stats
-            heat_efficiency: 0.0, // Condenser
-            predictive_aim: 0,    // Stabilizer
-            target_priority: null,// Headband (MAX_HP)
-            auto_collect: 0       // FukaPay
+            damage_pct: 0, rate_pct: 0, crit_chance: 0, xp_gain: 0,
+            hp_max: 0, speed_pct: 0, proj_speed_pct: 0, support_effect: 0, self_damage: 0,
+            life_on_hit: 0, gold_gain: 0, aoe_pct: 0, crit_damage: 0, damage_reduction: 0,
+            chain_range_pct: 0, support_level_bonus: 0,
+            final_damage_mul: 0, self_damage_pct: 0,
+            hit_damage_mul_pct: 0, dot_power_pct: 0
         };
 
         // Tree Stats (Rank Multiplier)
@@ -357,11 +315,7 @@ Object.assign(GameEngine.prototype, {
             hit_damage_mul_pct: 0, dot_power_pct: 0,
             chain_count: 0, shield_bash_mul: 0, mp_regen_pct: 0, // Artifact stats
             hp_regen: 0, // Crew stats
-            damage_taken_mul: 0,
-            heat_efficiency: 0.0,
-            predictive_aim: 0,
-            target_priority: null,
-            auto_collect: 0
+            damage_taken_mul: 0
         };
 
         // Bonus Stats (Level Up Fillers)
@@ -550,8 +504,8 @@ Object.assign(GameEngine.prototype, {
                 targetArray = this.altGems;
                 targetKey = idx;
             }
-            else if (slotIndex === 'RING' || slotIndex === 'AMULET') {
-                const typeCheck = slotIndex === 'RING' ? ARTIFACT_TYPES.RING : ARTIFACT_TYPES.AMULET;
+            else if (slotIndex === 'PARTS' || slotIndex === 'GEAR') {
+                const typeCheck = slotIndex === 'PARTS' ? ARTIFACT_TYPES.PARTS : ARTIFACT_TYPES.GEAR;
                 if (item.type !== typeCheck) return;
                 targetSlotRef = this.equippedArtifacts;
                 targetKey = slotIndex;
@@ -601,13 +555,13 @@ Object.assign(GameEngine.prototype, {
                 this.altGems[i] = null;
             }
         }
-        if (this.equippedArtifacts.RING && this.equippedArtifacts.RING.uuid === uuid) {
-            unequippedItem = this.equippedArtifacts.RING;
-            this.equippedArtifacts.RING = null;
+        if (this.equippedArtifacts.PARTS && this.equippedArtifacts.PARTS.uuid === uuid) {
+            unequippedItem = this.equippedArtifacts.PARTS;
+            this.equippedArtifacts.PARTS = null;
         }
-        if (this.equippedArtifacts.AMULET && this.equippedArtifacts.AMULET.uuid === uuid) {
-            unequippedItem = this.equippedArtifacts.AMULET;
-            this.equippedArtifacts.AMULET = null;
+        if (this.equippedArtifacts.GEAR && this.equippedArtifacts.GEAR.uuid === uuid) {
+            unequippedItem = this.equippedArtifacts.GEAR;
+            this.equippedArtifacts.GEAR = null;
         }
 
         if (unequippedItem) {
@@ -676,8 +630,8 @@ Object.assign(GameEngine.prototype, {
             this.inventory.forEach(i => allItems.push({ item: i, source: { type: 'INV', index: this.inventory.indexOf(i) } }));
             this.equippedGems.forEach((i, idx) => { if (i) allItems.push({ item: i, source: { type: 'MAIN', index: idx } }); });
             this.altGems.forEach((i, idx) => { if (i) allItems.push({ item: i, source: { type: 'SUB', index: idx } }); });
-            if (this.equippedArtifacts.RING) allItems.push({ item: this.equippedArtifacts.RING, source: { type: 'ART', index: 'RING' } });
-            if (this.equippedArtifacts.AMULET) allItems.push({ item: this.equippedArtifacts.AMULET, source: { type: 'ART', index: 'AMULET' } });
+            if (this.equippedArtifacts.PARTS) allItems.push({ item: this.equippedArtifacts.PARTS, source: { type: 'ART', index: 'PARTS' } });
+            if (this.equippedArtifacts.GEAR) allItems.push({ item: this.equippedArtifacts.GEAR, source: { type: 'ART', index: 'GEAR' } });
 
             allItems.forEach(entry => {
                 const key = `${entry.item.id}_${entry.item.level}`;
@@ -1032,14 +986,7 @@ Object.assign(GameEngine.prototype, {
                 // End Overdrive -> Start Cooldown
                 this.isOverdrive = false;
                 this.isCoolingDown = true;
-                let cd = 300; // 5 seconds
-                // Condenser Efficiency: Reduces Cooldown
-                if (this.stats.heat_efficiency > 0) {
-                    cd *= (1.0 - this.stats.heat_efficiency * 0.5); // 15% reduction for 30% eff? Or full? Let's do partial.
-                    // User said "Cooling down reduction". Let's apply full efficiency.
-                    cd *= (1.0 - this.stats.heat_efficiency);
-                }
-                this.cooldownTimer = Math.floor(cd);
+                this.cooldownTimer = 300; // 5 seconds cooldown
 
                 triggerScreenShake(10, 8);
                 activeFloatingTexts.push(new FloatingText(RENDER_CONSTANTS.TURRET_POS_X, GAME_SETTINGS.CASTLE_Y - 100, "COOLING DOWN...", "#3498db", 24));
@@ -1049,16 +996,11 @@ Object.assign(GameEngine.prototype, {
         }
 
         // 3. Normal Phase
-        // Passive Cooling
+        // Passive Cooling (only if beam is NOT active)
         if (this.heat > 0 && !this.isBeamActive) {
             this.heat -= this.coolingRate;
             if (this.heat < 0) this.heat = 0;
         }
-
-        // Apply Heat Efficiency (Condenser): Faster Accumulation? User said "Faster Heat Accumulation"
-        // But usually heat is bad? Ah, Heat Blast uses heat as fuel. So gaining heat is good for activating it.
-        // Wait, did I implement heat gain? Heat gain is likely in handleAutoAttack or similar.
-        // Let's check handleAutoAttack for heat gain additions.
 
         // Check for Overdrive Trigger (Max Heat)
         if (this.heat >= this.maxHeat && !this.isBeamActive) {
@@ -1079,12 +1021,7 @@ Object.assign(GameEngine.prototype, {
         // [Hardcore] Continuous Beam Logic
         if (this.isBeamActive) {
             // Drain heat continuously
-            // Condenser Efficiency: Reduces drain rate
-            let drain = this.beamDrainRate;
-            if (this.stats.heat_efficiency > 0) {
-                drain *= (1.0 - this.stats.heat_efficiency); // Reduce drain by efficiency %
-            }
-            this.heat -= drain;
+            this.heat -= this.beamDrainRate;
             if (this.heat <= 0) {
                 this.heat = 0;
                 this.isBeamActive = false; // Stop beam when heat depleted
@@ -2749,316 +2686,328 @@ class EnemyUnit {
             audioManager.play('WARNING');
             this.isActive = false;
         }
-    }
 
-    takeDamage(damage, isCritical, sourceId) {
-        let finalDamage = damage;
-        const artifacts = engineState.artifacts;
+        takeDamage(damage, isCritical, sourceId) {
+            let finalDamage = damage;
+            const artifacts = engineState.artifacts;
 
-        // Artifact: Giant Killer
-        const giantKiller = artifacts.find(a => a.id === 'giant_killer');
-        if ((this.tier.id === 'BOSS' || this.tier.id === 'TANK') && giantKiller) {
-            finalDamage *= (giantKiller.config ? giantKiller.config.multiplier : 1.4);
-        }
+            // Artifact: Giant Killer
+            const giantKiller = artifacts.find(a => a.id === 'giant_killer');
+            if ((this.tier.id === 'BOSS' || this.tier.id === 'TANK') && giantKiller) {
+                finalDamage *= (giantKiller.config ? giantKiller.config.multiplier : 1.4);
+            }
 
-        // Artifact: Sniper Scope (Distance Bonus: Top half of screen)
-        const sniperScope = artifacts.find(a => a.id === 'sniper_scope');
-        if (sniperScope) {
-            const rangeY = sniperScope.config ? sniperScope.config.range_y : 400;
-            if (this.positionY < rangeY) {
+            // Artifact: Sniper Scope
+            const sniperScope = artifacts.find(a => a.id === 'sniper_scope');
+            if (this.positionY < (sniperScope ? sniperScope.config.range_y : 400) && sniperScope) {
                 finalDamage *= (sniperScope.config ? sniperScope.config.multiplier : 1.3);
             }
-        }
 
-        // Artifact: Elemental Mixer (2+ Statuses)
-        if (artifacts.some(a => a.id === 'elem_mixer')) {
-            let statusCount = 0;
-            if (this.burnTimer > 0) statusCount++;
-            if (this.poisonStacks > 0) statusCount++;
-            if (this.freezeTimer > 0) statusCount++;
-            if (this.shockTimer > 0) statusCount++;
-            if (this.soakedTimer > 0) statusCount++;
-            if (this.confusionTimer > 0) statusCount++;
-
-            if (statusCount >= 2) finalDamage *= 1.5;
-        }
-
-        // Artifact: Oil Flask (Direct hit boost for fireball)
-        const oilFlask = artifacts.find(a => a.id === 'oil_flask');
-        if (sourceId === 'fireball' && oilFlask) {
-            finalDamage *= (oilFlask.config ? oilFlask.config.multiplier : 1.5);
-        }
-
-        // Artifact: Zero Crystal (Instant Kill Check)
-        if (this.freezeTimer > 0 && artifacts.some(a => a.id === 'zero_crystal')) {
-            // No instant kill on Bosses or Active Shielded Aegis
-            if (this.tier.id !== 'BOSS' && (!this.isBarrierActive) && Math.random() < 0.1) {
-                finalDamage = this.health + 9999;
+            // Artifact: Unstable reactor (Random +20%)
+            if (artifacts.some(a => a.id === 'unstable_reactor') && Math.random() < 0.5) {
+                finalDamage *= 1.2;
             }
-        }
 
-        // [Patch] Aegis Barrier Logic
-        if (this.tier.id === 'AEGIS' && this.isBarrierActive) {
-            if (sourceId === 'reflected' || sourceId === 'shield_bash') {
-                // Correct counter technique
-                this.barrierHp--;
-                activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY - 40, "CRACK!", "#00d2d3", 30));
-                triggerScreenShake(5, 5);
+            // Artifact: Chaos Dice
+            if (artifacts.some(a => a.id === 'chaos_dice')) {
+                const roll = 0.5 + Math.random() * 1.5; // 0.5 ~ 2.0
+                finalDamage *= roll;
+            }
 
-                if (this.barrierHp <= 0) {
-                    this.isBarrierActive = false;
-                    this.stunTimer = 180; // Stunned for 3 seconds
-                    activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY - 60, "SHATTERED!", "#fff", 40));
-                    createIceShatter(this.positionX, this.positionY, 100); // Visual FX
-                    // Vulnerable now!
+            // Artifact: Oil Flask (Fire synergy)
+            if (this.burnTimer > 0 && artifacts.some(a => a.id === 'oil_flask') && sourceId !== 'burn_dot') {
+                finalDamage *= 1.5;
+            }
+
+            // Artifact: Elemental Mixer
+            if (artifacts.some(a => a.id === 'elem_mixer')) {
+                let statusCount = 0;
+                if (this.burnTimer > 0) statusCount++;
+                if (this.freezeTimer > 0) statusCount++;
+                if (this.shockTimer > 0) statusCount++;
+                if (this.poisonStacks > 0) statusCount++;
+                if (this.confusionTimer > 0) statusCount++;
+                if (statusCount >= 2) finalDamage *= 1.5;
+            }
+
+            // Artifact: Zero Crystal (Instant Kill Check)
+            if (this.freezeTimer > 0 && artifacts.some(a => a.id === 'zero_crystal')) {
+                // 10% chance to execute non-boss
+                if (this.tier.id !== 'BOSS' && Math.random() < 0.1) {
+                    finalDamage = this.health + 999;
+                    activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY, "SHATTER!", "#74b9ff", 30));
                 }
-                return; // No HP damage from the breaking hit itself (or maybe minimal)
-            } else {
-                // Immune to everything else
-                activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY - 30, "GUARD", "#00d2d3", 20));
-                activeParticles.push(new ParticleEffect(this.positionX, this.positionY + 20, "#00d2d3", 4));
-                return; // 0 Damage
+            }
+
+            // Apply Status Multipliers
+            // Dr. Xeno: Shock Multiplier
+            if (this.shockTimer > 0) {
+                finalDamage *= this.shockMultiplier;
+            }
+
+            // Dr. Xeno: Acid Multiplier (Vulnerability)
+            if (this.acidTimer > 0) {
+                finalDamage *= 2.0;
+            }
+
+            this.health -= finalDamage;
+            this.flashTime = 5;
+
+            // クリティカル時にヒットストップを発動 (約0.05秒)
+            if (isCritical && sourceId !== 'heat_blast') {
+                engineState.hitStopFrames = 3;
+            }
+
+            // Knockback Logic
+            if (this.freezeTimer <= 0 && sourceId !== 'burn_dot' && sourceId !== 'poison_dot' && sourceId !== 'leech_dot') {
+                if (this.tier.id === 'TANK') {
+                    this.positionY -= 1;
+                } else if (this.tier.id !== 'BOSS') {
+                    this.positionY -= 5;
+                }
+            }
+
+            // [Patch] Synergy Damage Colors
+            let popupColor = EFFECT_CONSTANTS.COLOR_NORMAL;
+            if (sourceId === 'steam') popupColor = "#dff9fb";
+            else if (sourceId === 'poison_blast') popupColor = "#be2edd";
+            else if (sourceId === 'electric') popupColor = "#f6e58d";
+            else if (sourceId === 'meltdown') popupColor = "#fab1a0";
+            else if (sourceId === 'overload') popupColor = "#ff5252";
+            else if (sourceId === 'superconduct') popupColor = "#a29bfe";
+            else if (sourceId === 'corrosion') popupColor = "#7fff00";
+            else if (sourceId === 'plague') popupColor = "#9b59b6";
+            else if (sourceId === 'glacier') popupColor = "#74b9ff";
+            else if (sourceId === 'shield_bash') popupColor = "#66fcf1";
+            else if (sourceId === 'burn_dot') popupColor = EFFECT_CONSTANTS.COLOR_BURN;
+            else if (isCritical) popupColor = EFFECT_CONSTANTS.COLOR_CRIT;
+
+            const synergyIds = [
+                'steam', 'poison_blast', 'electric', 'meltdown', 'overload', 'superconduct', 'corrosion', 'plague', 'glacier'
+            ];
+            const fontSize = (isCritical || synergyIds.includes(sourceId)) ? 28 : 18;
+            const displayText = isCritical ? `${Math.floor(finalDamage)}!` : `${Math.floor(finalDamage)}`;
+            activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY - 20, displayText, popupColor, fontSize));
+            audioManager.play('HIT');
+
+            // Death Check & Logic
+            if (this.health <= 0) {
+                this.health = 0;
+                if (this.isActive) {
+                    this.isActive = false;
+
+                    // XP Gain (Using new wrapper)
+                    engineState.addXp(this.xpValue);
+
+                    // Drop Generation
+                    if (Math.random() < GAME_SETTINGS.DROP_CHANCE) {
+                        generateDrop(this.positionX, this.positionY);
+                    }
+
+                    // Effects
+                    audioManager.play('EXPLOSION');
+                    // Explosion effect logic (simplified call if function exists, else inline)
+                    // Assuming createExplosion is global
+                    if (typeof createExplosion === 'function') createExplosion(this.positionX, this.positionY, this.tier.color);
+
+                    activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY, `+${Math.floor(this.xpValue)} XP`, "#f1c40f", 20));
+
+                    // Callback for progression
+                    engineState.checkProgression(this);
+                }
+            }
+
+            draw(context) {
+                context.save();
+
+                if (this.isDying) {
+                    // 徐々に透明にし、小さくする
+                    context.globalAlpha = Math.max(0, 1.0 - this.deathProgress);
+                    const deathScale = 1.0 - (this.deathProgress * 0.4);
+                    context.translate(this.positionX, this.positionY);
+                    context.scale(deathScale, deathScale);
+                    context.translate(-this.positionX, -this.positionY);
+                }
+
+                // 1. Target Marker
+                if (engineState.manualTargetId === this.id) {
+                    context.strokeStyle = EFFECT_CONSTANTS.COLOR_TARGET;
+                    context.lineWidth = 2;
+                    context.beginPath();
+                    context.arc(this.positionX, this.positionY, this.size * 0.8, 0, Math.PI * 2);
+                    context.stroke();
+                }
+
+                // 2. Determine Color based on Status
+                if (this.flashTime > 0) context.fillStyle = "#ffffff";
+                else if (this.confusionTimer > 0) context.fillStyle = "#e056fd";
+                else if (this.freezeTimer > 0) context.fillStyle = EFFECT_CONSTANTS.COLOR_FREEZE;
+                else if (this.stunTimer > 0) context.fillStyle = "#7f8c8d";
+                else if (this.burnTimer > 0) context.fillStyle = EFFECT_CONSTANTS.COLOR_BURN;
+                else if (this.poisonTimer > 0) context.fillStyle = "#8e44ad";
+                else if (this.soakedTimer > 0) context.fillStyle = "#3498db";
+                else if (this.shockTimer > 0) context.fillStyle = "#f1c40f";
+                else if (this.leechTimer > 0) context.fillStyle = "#2ecc71";
+                else context.fillStyle = this.tier.color;
+
+                const drawSize = this.size;
+                const halfSize = drawSize / 2;
+
+                // 3. Draw Enemy Image (New)
+                let enemyImg = null;
+                const tierId = this.tier.id;
+
+                if (tierId === 'BOSS') {
+                    // Determine Boss Type Logic (Simple matching by name or wave, assuming Boss Name is set)
+                    // Currently EnemyUnit doesn't hold 'name' directly from config unless passed, 
+                    // but we can infer or if BOSS_WAVES logic attached name to this.tier
+                    // However, BOSS_WAVES config is used to spawn. Let's check tier name?
+                    // Actually, `this.tier` is a reference to ENEMY_TIERS object.
+
+                    // Note: Bosses are spawned with currentWaveNumber Check in main logic.
+                    // Let's rely on specific boss tracking or just Cycle:
+                    // Wave 1-3: Slime, 4-6: Shadow, 7+: Golem?
+                    // Or simpler: Check the level/wave when spawned.
+
+                    // Current simple logic:
+                    if (engineState.currentWaveNumber % 10 === 0 && engineState.currentWaveNumber >= 10) enemyImg = GAME_ASSETS.BOSS_GOLEM;
+                    else if (engineState.currentWaveNumber >= 5) enemyImg = GAME_ASSETS.BOSS_SHADOW; // Late game standard boss
+                    else enemyImg = GAME_ASSETS.BOSS_SLIME; // Early boss
+
+                    // To be precise: match the BOSS_WAVES config if possible.
+                    // Since we don't have direct access here easily, let's use the loaded assets based on wave logic approximation or add a type property.
+                    // For now, let's just cycle or pick one based on wave.
+                    const wave = engineState.currentWaveNumber;
+                    const bossIndex = Math.floor((wave - 1) / 3) % 3; // 0, 1, 2
+                    if (bossIndex === 0) enemyImg = GAME_ASSETS.BOSS_SLIME;
+                    else if (bossIndex === 1) enemyImg = GAME_ASSETS.BOSS_SHADOW;
+                    else enemyImg = GAME_ASSETS.BOSS_GOLEM;
+
+                } else if (tierId === 'TANK') enemyImg = GAME_ASSETS.ENEMY_TANK;
+                else if (tierId === 'ROGUE') enemyImg = GAME_ASSETS.ENEMY_ROGUE;
+                else if (tierId === 'SWARM') enemyImg = GAME_ASSETS.ENEMY_SWARM;
+                else if (tierId === 'MAGIC') enemyImg = GAME_ASSETS.ENEMY_MAGIC;
+                else if (tierId === 'RARE') enemyImg = GAME_ASSETS.ENEMY_RARE;
+                else if (tierId === 'AEGIS') enemyImg = GAME_ASSETS.ENEMY_AEGIS;
+                else enemyImg = GAME_ASSETS.ENEMY_NORMAL;
+
+                if (enemyImg) {
+                    context.shadowBlur = 15;
+                    context.shadowColor = this.tier.color;
+
+                    // Rotation for some types
+                    const saveAngle = this.rotation || 0;
+                    // Rogue/Swarm might want to face direction? 
+                    // Currently they just move down mostly. Rogue moves angled.
+
+                    const drawSize = this.size * 1.5; // Slightly larger for sprites
+                    context.drawImage(enemyImg, this.positionX - drawSize / 2, this.positionY - drawSize / 2, drawSize, drawSize);
+                    context.shadowBlur = 0;
+                } else if (this.tier.id !== 'AEGIS') {
+                    // Fallback: Legacy Shape Drawing
+                    context.shadowBlur = 10;
+                    context.shadowColor = this.tier.color;
+                    context.beginPath();
+
+                    // ... (Copy existing shape logic if needed, or just circle fallback)
+                    context.arc(this.positionX, this.positionY, halfSize, 0, Math.PI * 2);
+                    context.fill();
+                }
+
+                // 4. Inner Details (Eyes/Core)
+                context.fillStyle = "rgba(0,0,0,0.5)";
+                context.beginPath();
+                if (this.tier.id === 'ROGUE') {
+                    context.arc(this.positionX, this.positionY - 5, 4, 0, Math.PI * 2);
+                } else {
+                    context.arc(this.positionX, this.positionY, 4, 0, Math.PI * 2);
+                }
+                context.fill();
+
+                // 5. Status Icons
+                if (this.confusionTimer > 0) {
+                    context.fillStyle = "#fff";
+                    context.font = "bold 14px Arial";
+                    context.fillText("?", this.positionX + halfSize, this.positionY - halfSize);
+                }
+                if (this.poisonStacks > 0) {
+                    context.fillStyle = "#8e44ad";
+                    context.font = "10px Arial";
+                    context.fillText(`${this.poisonStacks}`, this.positionX, this.positionY + 5);
+                }
+
+                // 6. Health Bar & Numeric HP Display (Strategic Placement)
+                context.shadowBlur = 0;
+                const isBoss = this.tier.id === 'BOSS';
+                const hpBarW = isBoss ? 100 : 40;
+                const hpBarH = isBoss ? 8 : 4;
+
+                // 描画位置の決定: ボスは下、ザコは上
+                const hpY = isBoss ? (this.positionY + halfSize + 15) : (this.positionY - halfSize - 15);
+
+                // 背景（黒枠）
+                context.fillStyle = "rgba(0, 0, 0, 0.8)";
+                context.fillRect(this.positionX - hpBarW / 2 - 1, hpY - 1, hpBarW + 2, hpBarH + 2);
+
+                // バー本体
+                context.fillStyle = "#222";
+                context.fillRect(this.positionX - hpBarW / 2, hpY, hpBarW, hpBarH);
+
+                const hpColor = this.freezeTimer > 0 ? "#74b9ff" : (isBoss ? "#ff3f34" : "#2ecc71");
+                context.fillStyle = hpColor;
+                const healthRatio = Math.max(0, this.health / this.maxHealth);
+                context.fillRect(this.positionX - hpBarW / 2, hpY, hpBarW * healthRatio, hpBarH);
+
+                // ボスの場合、体の中央に残りHP数値を表示
+                if (isBoss) {
+                    context.font = "bold 16px 'Consolas', 'Monaco', monospace"; // デジタル感のあるフォント
+                    context.textAlign = "center";
+                    context.textBaseline = "middle";
+                    const displayHp = Math.ceil(this.health).toLocaleString();
+
+                    // 視認性のためのドロップシャドウ/縁取り
+                    context.strokeStyle = "#000";
+                    context.lineWidth = 4;
+                    context.strokeText(displayHp, this.positionX, this.positionY);
+
+                    // ネオンカラーの数値
+                    context.fillStyle = "#fff";
+                    context.fillText(displayHp, this.positionX, this.positionY);
+
+                    // ボス名を表示 (バーのすぐ下)
+                    context.font = "bold 10px sans-serif";
+                    context.fillStyle = "#aaa";
+                    context.fillText(this.tier.name, this.positionX, hpY + hpBarH + 10);
+                }
+
+                // [Patch] Aegis Barrier Overlay
+                if (this.tier.id === 'AEGIS' && this.isBarrierActive) {
+                    context.shadowBlur = 10;
+                    context.shadowColor = "#00d2d3";
+                    context.strokeStyle = `rgba(0, 210, 211, ${0.6 + Math.sin(Date.now() / 200) * 0.4})`;
+                    context.lineWidth = 6;
+                    context.beginPath();
+                    // Draw Horizontal Barrier (Wall) in front
+                    // Full Screen Width (End to End)
+                    const barWidth = GAME_SETTINGS.SCREEN_WIDTH;
+                    context.moveTo(this.positionX - barWidth / 2, this.positionY + 40);
+                    context.lineTo(this.positionX + barWidth / 2, this.positionY + 40);
+                    context.stroke();
+
+                    // Draw Shield HP
+                    context.fillStyle = "#fff";
+                    context.font = "bold 20px sans-serif";
+                    context.textAlign = "center";
+                    context.fillText(`🛡️${this.barrierHp}`, this.positionX, this.positionY - this.size - 10);
+                    context.shadowBlur = 0;
+                }
+
+                context.restore();
             }
         }
-
-        // Shock Multiplier
-        if (this.shockTimer > 0) {
-            finalDamage *= this.shockMultiplier;
-        }
-
-        // Dr. Xeno: Acid Multiplier (Vulnerability)
-        if (this.acidTimer > 0) {
-            finalDamage *= 2.0;
-        }
-
-        this.health -= finalDamage;
-        this.flashTime = 5;
-
-        // クリティカル時にヒットストップを発動 (約0.05秒)
-        if (isCritical && sourceId !== 'heat_blast') {
-            engineState.hitStopFrames = 3;
-        }
-
-        // Knockback Logic
-        if (this.freezeTimer <= 0 && sourceId !== 'burn_dot' && sourceId !== 'poison_dot' && sourceId !== 'leech_dot') {
-            if (this.tier.id === 'TANK') {
-                this.positionY -= 1;
-            } else if (this.tier.id !== 'BOSS') {
-                this.positionY -= 5;
-            }
-        }
-
-        // [Patch] Synergy Damage Colors
-        let popupColor = EFFECT_CONSTANTS.COLOR_NORMAL;
-        if (sourceId === 'steam') popupColor = "#dff9fb";
-        else if (sourceId === 'poison_blast') popupColor = "#be2edd";
-        else if (sourceId === 'electric') popupColor = "#f6e58d";
-        else if (sourceId === 'meltdown') popupColor = "#fab1a0";
-        else if (sourceId === 'overload') popupColor = "#ff5252";
-        else if (sourceId === 'superconduct') popupColor = "#a29bfe";
-        else if (sourceId === 'corrosion') popupColor = "#7fff00";
-        else if (sourceId === 'plague') popupColor = "#9b59b6";
-        else if (sourceId === 'glacier') popupColor = "#74b9ff";
-        else if (sourceId === 'shield_bash') popupColor = "#66fcf1";
-        else if (sourceId === 'burn_dot') popupColor = EFFECT_CONSTANTS.COLOR_BURN;
-        else if (isCritical) popupColor = EFFECT_CONSTANTS.COLOR_CRIT;
-
-        const synergyIds = [
-            'steam', 'poison_blast', 'electric', 'meltdown', 'overload', 'superconduct', 'corrosion', 'plague', 'glacier'
-        ];
-        const fontSize = (isCritical || synergyIds.includes(sourceId)) ? 28 : 18;
-        const displayText = isCritical ? `${Math.floor(finalDamage)}!` : `${Math.floor(finalDamage)}`;
-        activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY - 20, displayText, popupColor, fontSize));
-        audioManager.play('HIT');
-    }
-
-    draw(context) {
-        context.save();
-
-        if (this.isDying) {
-            // 徐々に透明にし、小さくする
-            context.globalAlpha = Math.max(0, 1.0 - this.deathProgress);
-            const deathScale = 1.0 - (this.deathProgress * 0.4);
-            context.translate(this.positionX, this.positionY);
-            context.scale(deathScale, deathScale);
-            context.translate(-this.positionX, -this.positionY);
-        }
-
-        // 1. Target Marker
-        if (engineState.manualTargetId === this.id) {
-            context.strokeStyle = EFFECT_CONSTANTS.COLOR_TARGET;
-            context.lineWidth = 2;
-            context.beginPath();
-            context.arc(this.positionX, this.positionY, this.size * 0.8, 0, Math.PI * 2);
-            context.stroke();
-        }
-
-        // 2. Determine Color based on Status
-        if (this.flashTime > 0) context.fillStyle = "#ffffff";
-        else if (this.confusionTimer > 0) context.fillStyle = "#e056fd";
-        else if (this.freezeTimer > 0) context.fillStyle = EFFECT_CONSTANTS.COLOR_FREEZE;
-        else if (this.stunTimer > 0) context.fillStyle = "#7f8c8d";
-        else if (this.burnTimer > 0) context.fillStyle = EFFECT_CONSTANTS.COLOR_BURN;
-        else if (this.poisonTimer > 0) context.fillStyle = "#8e44ad";
-        else if (this.soakedTimer > 0) context.fillStyle = "#3498db";
-        else if (this.shockTimer > 0) context.fillStyle = "#f1c40f";
-        else if (this.leechTimer > 0) context.fillStyle = "#2ecc71";
-        else context.fillStyle = this.tier.color;
-
-        const drawSize = this.size;
-        const halfSize = drawSize / 2;
-
-        // 3. Draw Enemy Image (New)
-        let enemyImg = null;
-        const tierId = this.tier.id;
-
-        if (tierId === 'BOSS') {
-            // Determine Boss Type Logic (Simple matching by name or wave, assuming Boss Name is set)
-            // Currently EnemyUnit doesn't hold 'name' directly from config unless passed, 
-            // but we can infer or if BOSS_WAVES logic attached name to this.tier
-            // However, `this.tier` is a reference to ENEMY_TIERS object.
-
-            // Note: Bosses are spawned with currentWaveNumber Check in main logic.
-            // Let's rely on specific boss tracking or just Cycle:
-            // Wave 1-3: Slime, 4-6: Shadow, 7+: Golem?
-            // Or simpler: Check the level/wave when spawned.
-
-            // Current simple logic:
-            if (engineState.currentWaveNumber % 10 === 0 && engineState.currentWaveNumber >= 10) enemyImg = GAME_ASSETS.BOSS_GOLEM;
-            else if (engineState.currentWaveNumber >= 5) enemyImg = GAME_ASSETS.BOSS_SHADOW; // Late game standard boss
-            else enemyImg = GAME_ASSETS.BOSS_SLIME; // Early boss
-
-            // To be precise: match the BOSS_WAVES config if possible.
-            // Since we don't have direct access here easily, let's use the loaded assets based on wave logic approximation or add a type property.
-            // For now, let's just cycle or pick one based on wave.
-            const wave = engineState.currentWaveNumber;
-            const bossIndex = Math.floor((wave - 1) / 3) % 3; // 0, 1, 2
-            if (bossIndex === 0) enemyImg = GAME_ASSETS.BOSS_SLIME;
-            else if (bossIndex === 1) enemyImg = GAME_ASSETS.BOSS_SHADOW;
-            else enemyImg = GAME_ASSETS.BOSS_GOLEM;
-
-        } else if (tierId === 'TANK') enemyImg = GAME_ASSETS.ENEMY_TANK;
-        else if (tierId === 'ROGUE') enemyImg = GAME_ASSETS.ENEMY_ROGUE;
-        else if (tierId === 'SWARM') enemyImg = GAME_ASSETS.ENEMY_SWARM;
-        else if (tierId === 'MAGIC') enemyImg = GAME_ASSETS.ENEMY_MAGIC;
-        else if (tierId === 'RARE') enemyImg = GAME_ASSETS.ENEMY_RARE;
-        else if (tierId === 'AEGIS') enemyImg = GAME_ASSETS.ENEMY_AEGIS;
-        else enemyImg = GAME_ASSETS.ENEMY_NORMAL;
-
-        if (enemyImg) {
-            context.shadowBlur = 15;
-            context.shadowColor = this.tier.color;
-
-            // Rotation for some types
-            const saveAngle = this.rotation || 0;
-            // Rogue/Swarm might want to face direction? 
-            // Currently they just move down mostly. Rogue moves angled.
-
-            const drawSize = this.size * 1.5; // Slightly larger for sprites
-            context.drawImage(enemyImg, this.positionX - drawSize / 2, this.positionY - drawSize / 2, drawSize, drawSize);
-            context.shadowBlur = 0;
-        } else if (this.tier.id !== 'AEGIS') {
-            // Fallback: Legacy Shape Drawing
-            context.shadowBlur = 10;
-            context.shadowColor = this.tier.color;
-            context.beginPath();
-
-            // ... (Copy existing shape logic if needed, or just circle fallback)
-            context.arc(this.positionX, this.positionY, halfSize, 0, Math.PI * 2);
-            context.fill();
-        }
-
-        // 4. Inner Details (Eyes/Core)
-        context.fillStyle = "rgba(0,0,0,0.5)";
-        context.beginPath();
-        if (this.tier.id === 'ROGUE') {
-            context.arc(this.positionX, this.positionY - 5, 4, 0, Math.PI * 2);
-        } else {
-            context.arc(this.positionX, this.positionY, 4, 0, Math.PI * 2);
-        }
-        context.fill();
-
-        // 5. Status Icons
-        if (this.confusionTimer > 0) {
-            context.fillStyle = "#fff";
-            context.font = "bold 14px Arial";
-            context.fillText("?", this.positionX + halfSize, this.positionY - halfSize);
-        }
-        if (this.poisonStacks > 0) {
-            context.fillStyle = "#8e44ad";
-            context.font = "10px Arial";
-            context.fillText(`${this.poisonStacks}`, this.positionX, this.positionY + 5);
-        }
-
-        // 6. Health Bar & Numeric HP Display (Strategic Placement)
-        context.shadowBlur = 0;
-        const isBoss = this.tier.id === 'BOSS';
-        const hpBarW = isBoss ? 100 : 40;
-        const hpBarH = isBoss ? 8 : 4;
-
-        // 描画位置の決定: ボスは下、ザコは上
-        const hpY = isBoss ? (this.positionY + halfSize + 15) : (this.positionY - halfSize - 15);
-
-        // 背景（黒枠）
-        context.fillStyle = "rgba(0, 0, 0, 0.8)";
-        context.fillRect(this.positionX - hpBarW / 2 - 1, hpY - 1, hpBarW + 2, hpBarH + 2);
-
-        // バー本体
-        context.fillStyle = "#222";
-        context.fillRect(this.positionX - hpBarW / 2, hpY, hpBarW, hpBarH);
-
-        const hpColor = this.freezeTimer > 0 ? "#74b9ff" : (isBoss ? "#ff3f34" : "#2ecc71");
-        context.fillStyle = hpColor;
-        const healthRatio = Math.max(0, this.health / this.maxHealth);
-        context.fillRect(this.positionX - hpBarW / 2, hpY, hpBarW * healthRatio, hpBarH);
-
-        // ボスの場合、体の中央に残りHP数値を表示
-        if (isBoss) {
-            context.font = "bold 16px 'Consolas', 'Monaco', monospace"; // デジタル感のあるフォント
-            context.textAlign = "center";
-            context.textBaseline = "middle";
-            const displayHp = Math.ceil(this.health).toLocaleString();
-
-            // 視認性のためのドロップシャドウ/縁取り
-            context.strokeStyle = "#000";
-            context.lineWidth = 4;
-            context.strokeText(displayHp, this.positionX, this.positionY);
-
-            // ネオンカラーの数値
-            context.fillStyle = "#fff";
-            context.fillText(displayHp, this.positionX, this.positionY);
-
-            // ボス名を表示 (バーのすぐ下)
-            context.font = "bold 10px sans-serif";
-            context.fillStyle = "#aaa";
-            context.fillText(this.tier.name, this.positionX, hpY + hpBarH + 10);
-        }
-
-        // [Patch] Aegis Barrier Overlay
-        if (this.tier.id === 'AEGIS' && this.isBarrierActive) {
-            context.shadowBlur = 10;
-            context.shadowColor = "#00d2d3";
-            context.strokeStyle = `rgba(0, 210, 211, ${0.6 + Math.sin(Date.now() / 200) * 0.4})`;
-            context.lineWidth = 6;
-            context.beginPath();
-            // Draw Horizontal Barrier (Wall) in front
-            // Full Screen Width (End to End)
-            const barWidth = GAME_SETTINGS.SCREEN_WIDTH;
-            context.moveTo(this.positionX - barWidth / 2, this.positionY + 40);
-            context.lineTo(this.positionX + barWidth / 2, this.positionY + 40);
-            context.stroke();
-
-            // Draw Shield HP
-            context.fillStyle = "#fff";
-            context.font = "bold 20px sans-serif";
-            context.textAlign = "center";
-            context.fillText(`🛡️${this.barrierHp}`, this.positionX, this.positionY - this.size - 10);
-            context.shadowBlur = 0;
-        }
-
-        context.restore();
     }
 }
+
 
 class ZoneEffect {
     constructor(x, y, type, config) {
@@ -3555,33 +3504,17 @@ function selectEnemyHelper(enemyList, criteria) {
 }
 
 function getTarget() {
-    let candidates = activeEnemies.filter(e => e.isActive && e.positionY < GAME_SETTINGS.CASTLE_Y);
-    if (candidates.length === 0) return null;
-
-    // Headband: Prioritize Max HP (Boss/Tank)
-    if (engineState.stats.target_priority === 'MAX_HP') {
-        // Sort descending by MaxHP / CurrentHP? User said "Max HP". Or "Higher HP enemies".
-        // Let's use Current HP sort to kill "toughest current threat".
-        // Or Max HP to focus Bosses/Tanks regardless of damage taken.
-        // "HPの高い雑魚敵や、ボスを積極的に狙う" -> MaxHP implies "Strongest Type".
-        candidates.sort((a, b) => b.maxHealth - a.maxHealth); // Changed to maxHealth for "strongest type"
-        return candidates[0];
-    } else if (engineState.manualTargetId) {
-        const manual = candidates.find(e => e.id === engineState.manualTargetId);
-        if (manual) return manual;
+    if (engineState.manualTargetId) {
+        const manualTarget = activeEnemies.find(e => e.id === engineState.manualTargetId);
+        if (manualTarget && manualTarget.isActive) return manualTarget;
+        else engineState.manualTargetId = null;
     }
-
-    // Default: Nearest
-    let nearest = null;
-    let minD = 999999;
-    const tx = RENDER_CONSTANTS.TURRET_POS_X;
-    const ty = RENDER_CONSTANTS.TURRET_POS_Y;
-
-    for (const e of candidates) {
-        const d = Math.hypot(e.positionX - tx, e.positionY - ty);
-        if (d < minD) { minD = d; nearest = e; }
+    if (customAiFunction) {
+        try {
+            return customAiFunction(activeEnemies, selectEnemyHelper);
+        } catch (errorInstance) { console.warn("AI Error"); }
     }
-    return nearest;
+    return selectEnemyHelper(activeEnemies, SELECTION_CRITERIA.MIN_DIST);
 }
 
 function handleAutoAttack() {
@@ -3739,72 +3672,37 @@ function handleAutoAttack() {
                 engineState.baseIntegrity -= cost;
             }
 
-            const fireProjectile = (gem, stats, startX, startY) => {
-                if (!target || !target.isActive) return;
-
-                // Predictive Aiming (Stabilizer)
-                let aimAngle = Math.atan2(target.positionY - startY, target.positionX - startX);
-
-                if (engineState.stats.predictive_aim > 0) {
-                    // Simple Linear Interception
-                    const dist = Math.hypot(target.positionX - startX, target.positionY - startY);
-                    const timeToHit = dist / (gem.speed * (1 + (stats ? stats.proj_speed_pct || 0 : 0)));
-
-                    // Enemy Velocity Estimation (Assuming they move straight down/towards castle)
-                    // Most move basically down or slightly sideways.
-                    // We can peek at 'enemy.speed' or store velocity.
-                    // For now, assume straight down movement is dominant for simplicity or calculate from update?
-                    // Enemies in this game move towards castle logic is in update().
-                    // Let's assume standard vector towards castle center?
-                    // Using enemy's stored velocity would be best but enemy update doesn't expose VX/VY clearly in properties.
-                    // However, we can approximate: Most enemies move towards (TURRET_X, CASTLE_Y).
-                    const ex = target.positionX;
-                    const ey = target.positionY;
-                    const edx = RENDER_CONSTANTS.TURRET_POS_X - ex;
-                    const edy = GAME_SETTINGS.CASTLE_Y - ey;
-                    const edist = Math.hypot(edx, edy);
-                    const speed = target.baseSpeed * (target.slowFactor || 1.0); // Taking slow into account
-
-                    const predX = ex + (edx / edist) * speed * timeToHit;
-                    const predY = ey + (edy / edist) * speed * timeToHit;
-
-                    aimAngle = Math.atan2(predY - startY, predX - startX);
+            const fireProjectile = (cfg, tgt, x, y) => {
+                // Artifact: Phantom Barrel (Extra Shot)
+                const phantomBarrel = engineState.artifacts.find(a => a.id === 'phantom_barrel');
+                let shots = 1;
+                if (phantomBarrel) {
+                    const chance = phantomBarrel.config ? phantomBarrel.config.chance : 0.20;
+                    const extra = phantomBarrel.config ? phantomBarrel.config.extra_shots : 1;
+                    if (Math.random() < chance) shots += extra;
                 }
 
-                // Spread Calculation
-                let spreadAngle = EFFECT_CONSTANTS.MULTISHOT_SPREAD_ANGLE;
-                let randomSpread = (Math.random() - 0.5) * 0.1;
+                // Artifact: Chaos Dice
+                if (engineState.artifacts.some(a => a.id === 'chaos_dice')) {
+                    cfg.damage *= (0.5 + Math.random() * 1.5);
+                }
 
-                const totalProjectiles = (gem.projectiles || 1) + (supportGems.find(s => s.id === 'multishot') ? (supportGems.find(s => s.id === 'multishot').projectiles || 1) : 0);
-                const baseAngle = aimAngle; // Use aimed angle instead of fixed -PI/2
+                for (let s = 0; s < shots; s++) {
+                    const finalCfg = { ...cfg };
 
-                // If aiming at single target, fan out around aimAngle
-                // If aiming at 'nothing' (default), use -PI/2
-
-                // Multi-projectile fan logic override for AutoAttack?
-                // Original logic was always fan up (-PI/2).
-                // If we have a target, we want to fan around the TARGET direction.
-
-                for (let i = 0; i < totalProjectiles; i++) {
-                    let angle = baseAngle;
-                    if (totalProjectiles > 1) {
-                        angle += (i - (totalProjectiles - 1) / 2) * spreadAngle;
+                    let aimTarget = tgt;
+                    // ... (Original Aim Logic)
+                    if (tgt && finalCfg.id !== 'nova') {
+                        const dist = Math.hypot(tgt.positionX - x, tgt.positionY - y);
+                        const timeToHit = dist / finalCfg.speed;
+                        const enemySpeed = (tgt.freezeTimer > 0) ? 0 : tgt.baseSpeed;
+                        const predictedY = tgt.positionY + (enemySpeed * timeToHit);
+                        aimTarget = { positionX: tgt.positionX, positionY: predictedY };
                     }
-                    angle += randomSpread;
+                    // Scatter Phantom shots slightly
+                    const originX = s === 0 ? x : x + (Math.random() - 0.5) * 20;
 
-                    const vx = Math.cos(angle) * gem.speed;
-                    const vy = Math.sin(angle) * gem.speed;
-
-                    const pConfig = { ...gem, ...stats, velocityX: vx, velocityY: vy, sourceGemId: gem.id };
-                    activeProjectiles.push(new MagicProjectile(startX, startY, null, pConfig));
-
-                    // Heat Generation (Condenser Boost)
-                    let heatGen = 1.5;
-                    if (engineState.stats.heat_efficiency > 0) {
-                        // Efficiency increases GAIN? "ヒートの溜まる速度UP" = More heat per shot
-                        heatGen *= (1.0 + engineState.stats.heat_efficiency);
-                    }
-                    engineState.heat += heatGen;
+                    activeProjectiles.push(new MagicProjectile(originX, y, aimTarget, finalCfg));
                 }
             };
 
@@ -3856,7 +3754,7 @@ function handleAutoAttack() {
                     activeProjectiles.push(new MagicProjectile(sourceX, sourceY, null, { ...finalConfig, velocityX: vx, velocityY: vy }));
                 }
             } else {
-                fireProjectile(finalConfig, engineState.stats, sourceX, sourceY);
+                fireProjectile(finalConfig, target, sourceX, sourceY);
             }
 
             engineState.activeSupportUnits.forEach(unit => {
@@ -4647,7 +4545,21 @@ function generateDrop(positionX, positionY) {
 
     // 2. アイテムドロッププールの構築
     const itemPool = [];
-    const allTemplates = [...Object.values(GEMS), ...Object.values(ARTIFACTS)];
+    let allTemplates = [...Object.values(GEMS), ...Object.values(ARTIFACTS)];
+
+    // [Patch] Filter out already owned Unique items (Parts, Gear, Boss)
+    const ownedArtifactIds = [
+        ...Object.values(engineState.equippedArtifacts).filter(a => a).map(a => a.id),
+        ...engineState.inventory.filter(i => i.type === ARTIFACT_TYPES.PARTS || i.type === ARTIFACT_TYPES.GEAR || i.type === ARTIFACT_TYPES.BOSS).map(i => i.id),
+        ...engineState.artifacts.map(a => a.id)
+    ];
+
+    allTemplates = allTemplates.filter(t => {
+        if (t.type === ARTIFACT_TYPES.PARTS || t.type === ARTIFACT_TYPES.GEAR || t.type === ARTIFACT_TYPES.BOSS) {
+            return !ownedArtifactIds.includes(t.id);
+        }
+        return true;
+    });
 
     // 現在の装備状況を確認
     const currentEquippedItems = [...engineState.equippedGems, ...engineState.altGems].filter(itemInstance => itemInstance !== null);

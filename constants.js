@@ -64,8 +64,8 @@ export const GEM_TYPES = {
 };
 
 export const ARTIFACT_TYPES = {
-    RING: 'RING',
-    AMULET: 'AMULET',
+    PARTS: 'PARTS',
+    GEAR: 'GEAR',
     BOSS: 'BOSS_ARTIFACT' // New type
 };
 
