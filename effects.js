@@ -211,6 +211,9 @@ export class BeamEffect {
     draw(context) {
         if (this.life <= 0) return;
 
+        // Performance tracking
+        const drawStart = performance.now();
+
         context.save();
         // Use integer coordinates to avoid sub-pixel rendering
         context.translate(Math.floor(this.x), Math.floor(this.y));
@@ -229,25 +232,31 @@ export class BeamEffect {
             this._lastColor = this.color;
         }
 
-        // Beam core (bright gradient)
-        context.globalAlpha = this.life * 0.8;
+        // Beam core (bright gradient) - shadowBlur removed for performance
+        context.globalAlpha = this.life * 0.9;
         context.fillStyle = this._cachedGradient;
         context.fillRect(0, -currentWidth / 2, currentLength, currentWidth);
 
-        // Beam glow (outer) - reduced shadowBlur from 30 to 15 for performance
-        context.globalAlpha = this.life * 0.3;
-        context.shadowBlur = 15;
-        context.shadowColor = this.color;
-        context.fillRect(0, -currentWidth / 2, currentLength, currentWidth);
+        // Outer glow layer (no shadowBlur)
+        context.globalAlpha = this.life * 0.4;
+        context.fillRect(0, -currentWidth / 2 * 1.2, currentLength, currentWidth * 1.2);
 
-        // Critical: simplified to single additional layer (removed extra glow)
+        // Critical: single additional layer (no shadowBlur)
         if (this.isCritical) {
-            context.globalAlpha = this.life * 0.2;
-            context.shadowBlur = 20;
-            context.fillRect(0, -currentWidth / 2 * 1.2, currentLength, currentWidth * 1.2);
+            context.globalAlpha = this.life * 0.25;
+            context.fillRect(0, -currentWidth / 2 * 1.4, currentLength, currentWidth * 1.4);
         }
 
         context.restore();
+
+        // Log draw performance every 60 frames
+        if (!this._drawFrameCount) this._drawFrameCount = 0;
+        this._drawFrameCount++;
+
+        if (this._drawFrameCount % 60 === 0) {
+            const drawTime = performance.now() - drawStart;
+            console.log(`[BeamEffect.draw] Draw time: ${drawTime.toFixed(2)}ms`);
+        }
     }
 }
 
