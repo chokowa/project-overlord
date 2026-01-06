@@ -245,9 +245,9 @@ class GameEngine {
         activeShockwaves = [];
         this.manualTargetId = null;
 
-        // Reset speed logic (keep setting or reset? defaulting to reset for safety)
-        this.timeScale = 0.7;
-        this.speedLevel = 0;
+        // Reset speed logic (keep setting or reset? defaulting to normal speed)
+        this.timeScale = 1.0; // Changed from 0.7 to 1.0
+        this.speedLevel = 1;  // Changed from 0 to 1
         this.accumulator = 0;
         const btn = document.getElementById('speed-btn');
         if (btn) btn.innerHTML = "▶️ x1.0";
