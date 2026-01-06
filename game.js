@@ -2062,6 +2062,10 @@ class EnemyUnit {
         const baseSpd = (1.2 + Math.random() * 0.8);
         this.baseSpeed = baseSpd * (0.9 + (engineState.currentWaveNumber * 0.1)) * tier.speedMod;
 
+        // XP Value calculation
+        const baseXp = 50; // Base XP per enemy
+        this.xpValue = Math.floor(baseXp * tier.xpMod * waveMultiplier);
+
         this.isActive = true;
         this.flashTime = 0;
         this.burnTimer = 0;
