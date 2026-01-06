@@ -779,8 +779,7 @@ export function refreshInventoryInterface() {
                 'pierce': 'assets/PI.png',
                 'chain': 'assets/CH.png'
             };
-            // Prioritize item.iconImage, then fallback to imgMap
-            const imgSrc = item.iconImage || imgMap[item.id];
+            const imgSrc = imgMap[item.id];
 
             // Icons
             let typeIcon = '';
@@ -986,8 +985,7 @@ export function refreshInventoryInterface() {
             'pierce': 'assets/PI.png',
             'chain': 'assets/CH.png'
         };
-        // Prioritize item.iconImage, then fallback to imgMap
-        const imgSrc = item.iconImage || imgMap[item.id];
+        const imgSrc = imgMap[item.id];
 
         // Central Visual (Image or Large Icon)
         let centerVisual = '';

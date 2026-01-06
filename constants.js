@@ -143,13 +143,11 @@ export const UNIQUES = {
     VAMPIRE_FANG: {
         id: 'vampire_fang', name: '吸血の牙', type: ARTIFACT_TYPES.GEAR,
         color: '#8e44ad', description: "攻撃命中時 HP回復 +1 (確率)",
-        iconImage: 'assets/artifacts/vampire_fang.png',
         stats: { life_on_hit: 0.8 }
     },
     MIDAS_RING: {
         id: 'midas_ring', name: 'ミダスの指輪', type: ARTIFACT_TYPES.PARTS,
         color: '#f1c40f', description: "Gold獲得量 +40%",
-        iconImage: 'assets/artifacts/midas_ring.png',
         stats: { gold_gain: 0.4 }
     },
     OMEGA_PRISM: {
@@ -242,28 +240,24 @@ export const GEMS = {
 
 export const ARTIFACTS = {
     RUBY_RING: {
-        id: 'ruby_ring', name: 'ルビーリング', type: ARTIFACT_TYPES.PARTS,
-        color: '#e74c3c', description: "攻撃力 +10%",
-        iconImage: 'assets/artifacts/ruby_ring.png',
-        stats: { damage_mul: 0.10 }
+        id: 'ruby_ring', name: '赤の指輪', type: ARTIFACT_TYPES.PARTS,
+        color: '#c0392b', description: "ダメージ +15%",
+        stats: { damage_pct: 0.15 }
     },
     EMERALD_RING: {
-        id: 'emerald_ring', name: 'エメラルドリング', type: ARTIFACT_TYPES.PARTS,
-        color: '#27ae60', description: "攻撃速度 +15%",
-        iconImage: 'assets/artifacts/emerald_ring.png',
-        stats: { rate_mul: 0.15 }
+        id: 'emerald_ring', name: '緑の指輪', type: ARTIFACT_TYPES.PARTS,
+        color: '#27ae60', description: "発射速度 +15%",
+        stats: { rate_pct: 0.15 }
     },
     SAPPHIRE_AMULET: {
-        id: 'sapphire_amulet', name: 'サファイアの護符', type: ARTIFACT_TYPES.GEAR,
-        color: '#3498db', description: "最大HP +50",
-        iconImage: 'assets/artifacts/sapphire_amulet.png',
-        stats: { hp_max: 50 }
+        id: 'sapphire_amulet', name: '青のアミュレット', type: ARTIFACT_TYPES.GEAR,
+        color: '#2980b9', description: "クリティカル率 +8%",
+        stats: { crit_chance: 0.08 }
     },
     GOLD_AMULET: {
-        id: 'gold_amulet', name: '黄金の護符', type: ARTIFACT_TYPES.GEAR,
-        color: '#f39c12', description: "クリティカル率 +5%",
-        iconImage: 'assets/artifacts/gold_amulet.png',
-        stats: { crit_chance: 0.05 }
+        id: 'gold_amulet', name: '黄金の首飾り', type: ARTIFACT_TYPES.GEAR,
+        color: '#f39c12', description: "XP獲得量 +20%",
+        stats: { xp_gain: 0.20 }
     },
     // --- PARTS (Physical Enhancements) ---
     HIGH_CAPACITY: {
