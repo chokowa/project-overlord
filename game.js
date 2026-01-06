@@ -137,6 +137,7 @@ class GameEngine {
         this.isFiringEnabled = true; // [Hardcore] Manual fire control
         this.isBeamActive = false; // [Hardcore] Continuous beam active
         this.beamDrainRate = 1.5; // Heat consumed per frame during beam
+        this.activeBeam = null; // Object pooling: reuse beam instance
 
         // [Hardcore] Overdrive System
         this.isOverdrive = false; // 1.2x damage, heat locked at max
@@ -214,11 +215,12 @@ class GameEngine {
 
         // [Hardcore] Reset Heat
         this.heat = 0;
-        this.isOverheated = false;
-        this.overheatCooldownTimer = 0;
-        this.isFiringEnabled = true;
+        this.maxHeat = 200;
+        this.heatGainRate = 0.5;
+        this.coolingRate = 0.2;
         this.isBeamActive = false;
-        this.isOverdrive = false;
+        this.beamDrainRate = 1.0;
+        this.activeBeam = null; // Object pooling: reuse beam instance
         this.overdriveTimer = 0;
         this.isCoolingDown = false;
         this.cooldownTimer = 0;
@@ -1028,16 +1030,23 @@ Object.assign(GameEngine.prototype, {
                 beamAngle = -Math.PI / 2;
             }
 
-            // Create beam visual every frame
-            activeZoneEffects.push(new BeamEffect(
-                RENDER_CONSTANTS.TURRET_POS_X,
-                RENDER_CONSTANTS.TURRET_POS_Y,
-                beamAngle,
-                beamWidth,
-                beamLength,
-                blastColor,
-                isCritical
-            ));
+            // Object pooling: Reuse beam instance instead of creating new one every frame
+            if (!this.activeBeam) {
+                // Create beam on first use
+                this.activeBeam = new BeamEffect(
+                    RENDER_CONSTANTS.TURRET_POS_X,
+                    RENDER_CONSTANTS.TURRET_POS_Y,
+                    beamAngle,
+                    beamWidth,
+                    beamLength,
+                    blastColor,
+                    isCritical
+                );
+                activeZoneEffects.push(this.activeBeam);
+            } else {
+                // Update existing beam parameters
+                this.activeBeam.updateBeam(beamAngle, beamWidth, beamLength, blastColor, isCritical);
+            }
 
             // Damage enemies in beam
             activeEnemies.forEach(enemy => {
@@ -1080,6 +1089,7 @@ Object.assign(GameEngine.prototype, {
         if (this.isBeamActive) {
             // Turn off beam
             this.isBeamActive = false;
+            this.activeBeam = null; // Clear beam instance for cleanup
             activeFloatingTexts.push(new FloatingText(RENDER_CONSTANTS.TURRET_POS_X, GAME_SETTINGS.CASTLE_Y - 80, "BEAM OFF", "#66fcf1", 18));
         } else {
             // Try to turn on beam

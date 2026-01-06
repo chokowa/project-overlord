@@ -163,7 +163,7 @@ export class BeamEffect {
      * @param {number} length - ビーム長さ
      * @param {string} color - ビーム色
      * @param {boolean} isCritical - クリティカル版かどうか
- */
+     */
     constructor(x, y, angle, width, length, color, isCritical) {
         this.x = x;
         this.y = y;
@@ -174,7 +174,30 @@ export class BeamEffect {
         this.isCritical = isCritical;
         this.life = 1.0;
         this.fadeSpeed = 0.05;
-        this.expandProgress = 0; // Beam expansion animation
+        this.expandProgress = 1.0; // Start fully expanded for continuous beam
+
+        // Gradient caching for performance
+        this._cachedGradient = null;
+        this._lastLength = 0;
+        this._lastColor = '';
+    }
+
+    /**
+     * Update beam parameters for reuse (object pooling)
+     * @param {number} angle - ビーム角度(ラジアン)
+     * @param {number} width - ビーム幅
+     * @param {number} length - ビーム長さ
+     * @param {string} color - ビーム色
+     * @param {boolean} isCritical - クリティカル版かどうか
+     */
+    updateBeam(angle, width, length, color, isCritical) {
+        this.angle = angle;
+        this.width = width;
+        this.length = length;
+        this.color = color;
+        this.isCritical = isCritical;
+        this.life = 1.0; // Reset life for continuous beam
+        this.expandProgress = 1.0; // Keep fully expanded
     }
 
     update() {
@@ -189,33 +212,39 @@ export class BeamEffect {
         if (this.life <= 0) return;
 
         context.save();
-        context.translate(this.x, this.y);
+        // Use integer coordinates to avoid sub-pixel rendering
+        context.translate(Math.floor(this.x), Math.floor(this.y));
         context.rotate(this.angle);
 
-        const currentLength = this.length * this.expandProgress;
-        const currentWidth = this.width * this.expandProgress;
+        const currentLength = Math.floor(this.length * this.expandProgress);
+        const currentWidth = Math.floor(this.width * this.expandProgress);
+
+        // Gradient caching: only recreate if length or color changed
+        if (currentLength !== this._lastLength || this.color !== this._lastColor) {
+            this._cachedGradient = context.createLinearGradient(0, 0, currentLength, 0);
+            this._cachedGradient.addColorStop(0, this.color);
+            this._cachedGradient.addColorStop(0.5, this.color);
+            this._cachedGradient.addColorStop(1, 'rgba(255,255,255,0)');
+            this._lastLength = currentLength;
+            this._lastColor = this.color;
+        }
 
         // Beam core (bright gradient)
-        const coreGrad = context.createLinearGradient(0, 0, currentLength, 0);
-        coreGrad.addColorStop(0, this.color);
-        coreGrad.addColorStop(0.5, this.color);
-        coreGrad.addColorStop(1, 'rgba(255,255,255,0)');
-
         context.globalAlpha = this.life * 0.8;
-        context.fillStyle = coreGrad;
+        context.fillStyle = this._cachedGradient;
         context.fillRect(0, -currentWidth / 2, currentLength, currentWidth);
 
-        // Beam glow (outer)
-        context.globalAlpha = this.life * 0.4;
-        context.shadowBlur = 30;
+        // Beam glow (outer) - reduced shadowBlur from 30 to 15 for performance
+        context.globalAlpha = this.life * 0.3;
+        context.shadowBlur = 15;
         context.shadowColor = this.color;
         context.fillRect(0, -currentWidth / 2, currentLength, currentWidth);
 
-        // Critical: extra glow layers
+        // Critical: simplified to single additional layer (removed extra glow)
         if (this.isCritical) {
-            context.globalAlpha = this.life * 0.3;
-            context.shadowBlur = 50;
-            context.fillRect(0, -currentWidth / 2 * 1.5, currentLength, currentWidth * 1.5);
+            context.globalAlpha = this.life * 0.2;
+            context.shadowBlur = 20;
+            context.fillRect(0, -currentWidth / 2 * 1.2, currentLength, currentWidth * 1.2);
         }
 
         context.restore();
