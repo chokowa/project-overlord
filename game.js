@@ -2660,6 +2660,12 @@ class EnemyUnit {
             }
 
             let dmg = GAME_SETTINGS.CASTLE_DAMAGE;
+
+            // [Patch] Wave Scaling (5% per wave)
+            // Ensure late-game breaches are fatal
+            const waveScale = 1.0 + (engineState.currentWaveNumber * 0.05);
+            dmg *= waveScale;
+
             // Apply Damage Taken Multiplier (e.g. Glass Cannon)
             dmg *= (1.0 + (engineState.stats.damage_taken_mul || 0));
 
@@ -3253,6 +3259,10 @@ class EnemyProjectile {
 
         if (this.y >= GAME_SETTINGS.CASTLE_Y) {
             let dmg = this.damage;
+            // [Patch] Wave Scaling (5% per wave)
+            const waveScale = 1.0 + (engineState.currentWaveNumber * 0.05);
+            dmg *= waveScale;
+
             // Apply Damage Taken Multiplier (e.g. Glass Cannon)
             dmg *= (1.0 + (engineState.stats.damage_taken_mul || 0));
 
