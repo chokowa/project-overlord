@@ -3788,9 +3788,9 @@ function mainLoop() {
         const beforeAcc = engineState.accumulator;
         engineState.accumulator += engineState.timeScale;
 
-        // Debug: log accumulator changes during heat blast
-        if (engineState.isBeamActive && Math.random() < 0.01) {
-            console.log(`[Accumulator] Before: ${beforeAcc.toFixed(2)} + ${engineState.timeScale} = After: ${engineState.accumulator.toFixed(2)}`);
+        // Debug: log EVERY accumulator change during heat blast
+        if (engineState.isBeamActive && window._fpsTracker && window._fpsTracker.loopCount % 30 === 0) {
+            console.log(`[Accumulator] ${beforeAcc.toFixed(2)} + ${engineState.timeScale} = ${engineState.accumulator.toFixed(2)}`);
         }
 
         // Cap accumulator to prevent spiral of death
