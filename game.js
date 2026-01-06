@@ -1393,7 +1393,19 @@ function handleCanvasInput(event) {
     for (let i = engineState.activeDrops.length - 1; i >= 0; i--) {
         const drop = engineState.activeDrops[i];
         const dist = Math.hypot(drop.x - clickX, drop.y - clickY);
-        if (dist < RENDER_CONSTANTS.DROP_SIZE * 1.5) {
+
+        // [Patch] Enhanced Pickup Range for Touch
+        let pickupRadius = (RENDER_CONSTANTS.DROP_SIZE || 20) * 1.5;
+        if (event.pointerType === 'touch') {
+            // Touch: Make it much easier (approx finger size + buffer)
+            // Use larger of: 3x visual size OR 70px absolute radius
+            pickupRadius = Math.max(pickupRadius * 2.5, 70);
+        } else {
+            // Mouse: Slight boost for convenience
+            pickupRadius = Math.max(pickupRadius, 40);
+        }
+
+        if (dist < pickupRadius) {
             if (drop.itemTemplate.type === 'GOLD') {
                 let val = (GAME_SETTINGS.GOLD_VALUE_BASE || 25) + Math.floor(Math.random() * 10);
                 if (engineState.stats.gold_gain > 0) val = Math.floor(val * (1 + engineState.stats.gold_gain));
@@ -4315,43 +4327,43 @@ function displayGameOver() {
 
     gameContext.restore();
 
-    // Remove old listener if exists
-    if (window._retryClickListener) {
-        gameCanvas.removeEventListener('click', window._retryClickListener);
-        gameCanvas.removeEventListener('touchend', window._retryClickListener);
+    // Add click listener only once
+    if (!window._retryClickListener) {
+        window._retryClickListener = function (e) {
+            if (!engineState.isGameOver) return;
+
+            const rect = gameCanvas.getBoundingClientRect();
+            const scaleX = gameCanvas.width / rect.width;
+            const scaleY = gameCanvas.height / rect.height;
+
+            // Get click coordinates (handle both mouse and touch)
+            let clientX, clientY;
+            if (e.type.startsWith('touch')) {
+                const touch = e.touches[0] || e.changedTouches[0];
+                if (!touch) return;
+                clientX = touch.clientX;
+                clientY = touch.clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            const x = (clientX - rect.left) * scaleX;
+            const y = (clientY - rect.top) * scaleY;
+
+            // Check if click is within button bounds (using closure-captured coordinates)
+            if (x >= btnX && x <= btnX + btnWidth && y >= btnY && y <= btnY + btnHeight) {
+                restartGame();
+            }
+        };
+
+        gameCanvas.addEventListener('click', window._retryClickListener);
+        gameCanvas.addEventListener('touchend', window._retryClickListener);
     }
+}
 
-    // Add click listener with closure capturing button coordinates
-    window._retryClickListener = function (e) {
-        if (!engineState.isGameOver) return;
-
-        const rect = gameCanvas.getBoundingClientRect();
-        const scaleX = gameCanvas.width / rect.width;
-        const scaleY = gameCanvas.height / rect.height;
-
-        // Get click coordinates (handle both mouse and touch)
-        let clientX, clientY;
-        if (e.type.startsWith('touch')) {
-            const touch = e.touches[0] || e.changedTouches[0];
-            if (!touch) return;
-            clientX = touch.clientX;
-            clientY = touch.clientY;
-        } else {
-            clientX = e.clientX;
-            clientY = e.clientY;
-        }
-
-        const x = (clientX - rect.left) * scaleX;
-        const y = (clientY - rect.top) * scaleY;
-
-        // Check if click is within button bounds (using closure-captured coordinates)
-        if (x >= btnX && x <= btnX + btnWidth && y >= btnY && y <= btnY + btnHeight) {
-            restartGame();
-        }
-    };
-
-    gameCanvas.addEventListener('click', window._retryClickListener);
-    gameCanvas.addEventListener('touchend', window._retryClickListener);
+function restartGame() {
+    location.reload();
 }
 
 function addExperience(value) {
