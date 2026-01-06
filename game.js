@@ -181,16 +181,14 @@ class GameEngine {
 
     toggleGameSpeed() {
         this.speedLevel = (this.speedLevel + 1) % 3;
-        if (this.speedLevel === 0) this.timeScale = 0.7;
-        else if (this.speedLevel === 1) this.timeScale = 1.0;
-        else if (this.speedLevel === 2) this.timeScale = 2.0;
+        if (this.speedLevel === 0) this.timeScale = 1.0;      // Normal speed (was 0.7)
+        else if (this.speedLevel === 1) this.timeScale = 1.5; // 1.5x speed (was 1.0)
+        else if (this.speedLevel === 2) this.timeScale = 2.0; // 2x speed
 
         const btn = document.getElementById('speed-btn');
         if (btn) {
-            // Internal 0.7 -> Display x1.0 (Base)
-            // Internal 1.0 -> Display x1.5
-            // Internal 2.0 -> Display x3.0
-            btn.innerHTML = this.speedLevel === 0 ? "▶️ x1.0" : (this.speedLevel === 1 ? "⏩️ x1.5" : "⏩️⏩️ x3.0");
+            // Speed options: x1.0 (Normal), x1.5, x2.0
+            btn.innerHTML = this.speedLevel === 0 ? "▶️ x1.0" : (this.speedLevel === 1 ? "⏩️ x1.5" : "⏩️⏩️ x2.0");
         }
     }
 
