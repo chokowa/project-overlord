@@ -263,6 +263,42 @@ class GameEngine {
         }
     }
 
+    /** フカPay自動アイテム回収処理 */
+    processAutoCollection() {
+        // フカPayが装備されているかチェック
+        const hasFukaPay = Object.values(this.equippedArtifacts).some(artifact =>
+            artifact && artifact.id === 'fuka_pay'
+        );
+
+        if (!hasFukaPay || this.activeDrops.length === 0) return;
+
+        // フカPay装備時は全画面のアイテムを自動回収
+        for (let i = this.activeDrops.length - 1; i >= 0; i--) {
+            const drop = this.activeDrops[i];
+
+            // アイテムを回収
+            if (drop.itemTemplate.type === 'GOLD') {
+                // ゴールドの場合
+                let val = (GAME_SETTINGS.GOLD_VALUE_BASE || 25) + Math.floor(Math.random() * 10);
+                if (this.stats.gold_gain > 0) val = Math.floor(val * (1 + this.stats.gold_gain));
+                this.gold += val;
+                activeFloatingTexts.push(new FloatingText(drop.x, drop.y, `+${val} G`, "#f1c40f", 14));
+            } else {
+                // アイテムの場合
+                this.addItemToInventory(drop.itemTemplate);
+                activeFloatingTexts.push(new FloatingText(drop.x, drop.y, "AUTO!", "#3498db", 12));
+            }
+
+            // アイテムを削除
+            this.activeDrops.splice(i, 1);
+        }
+
+        // UIを更新
+        if (this.inventoryDirty) {
+            refreshInventoryInterface();
+        }
+    }
+
     /** スキルツリーのステータス再計算 (Rank System対応) */
     recalcStats() {
         this.stats = {
