@@ -295,17 +295,21 @@ export function updateHudDisplay() {
     // [Hardcore] Heat Blast Button State
     const heatBlastBtn = document.getElementById('heat-blast-btn');
     if (heatBlastBtn) {
-        const canBlast = engineState.heat >= 50 && !engineState.isOverheated;
+        const canBlast = engineState.heat >= 50 && !engineState.isOverheated && !engineState.isBeamActive;
         if (canBlast) {
             heatBlastBtn.style.borderColor = '#f39c12';
             heatBlastBtn.style.color = '#f39c12';
             heatBlastBtn.style.opacity = '1';
             heatBlastBtn.style.filter = 'none';
+            heatBlastBtn.style.cursor = 'pointer';
+            heatBlastBtn.classList.remove('disabled');
         } else {
             heatBlastBtn.style.borderColor = '#555';
             heatBlastBtn.style.color = '#555';
             heatBlastBtn.style.opacity = '0.4';
             heatBlastBtn.style.filter = 'grayscale(1)';
+            heatBlastBtn.style.cursor = 'not-allowed';
+            heatBlastBtn.classList.add('disabled');
         }
     }
 
