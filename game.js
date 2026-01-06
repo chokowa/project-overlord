@@ -3781,7 +3781,14 @@ function mainLoop() {
 
     if (!engineState.isPaused) {
         // [Patch] Variable Time Step Logic
+        const beforeAcc = engineState.accumulator;
         engineState.accumulator += engineState.timeScale;
+
+        // Debug: log accumulator changes during heat blast
+        if (engineState.isBeamActive && Math.random() < 0.01) {
+            console.log(`[Accumulator] Before: ${beforeAcc.toFixed(2)} + ${engineState.timeScale} = After: ${engineState.accumulator.toFixed(2)}`);
+        }
+
         // Cap accumulator to prevent spiral of death
         if (engineState.accumulator > 5.0) engineState.accumulator = 5.0;
 
