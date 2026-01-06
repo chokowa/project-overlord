@@ -1730,20 +1730,83 @@ class MagicProjectile {
                 }
             }
             else if (this.effectType === 'water') {
-                // Water: Streamlined Drop
-                context.moveTo(size, 0);
-                context.bezierCurveTo(-size, size, -size * 2, 0, -size, -size);
-                context.closePath();
+                // Water: Hydro Stream
+                context.save();
+
+                // 1. Trail Stream (Water Jet)
+                context.beginPath();
+                context.moveTo(0, 0);
+                context.lineTo(-size * 4, 0); // Long tail
+                context.lineWidth = size * 0.8;
+                context.lineCap = 'round';
+                context.strokeStyle = "#48dbfb"; // Brighter cyan
+                context.shadowBlur = 8;
+                context.shadowColor = "#0abde3";
+                context.stroke();
+
+                // Inner High-Pressure core
+                context.beginPath();
+                context.moveTo(-size * 0.5, 0);
+                context.lineTo(-size * 3.5, 0);
+                context.lineWidth = size * 0.4;
+                context.strokeStyle = "rgba(255, 255, 255, 0.6)";
+                context.shadowBlur = 0;
+                context.stroke();
+
+                // 2. Warhead (Water Orb)
+                context.fillStyle = "#48dbfb";
+                context.beginPath();
+                context.arc(0, 0, size, 0, Math.PI * 2);
+                context.fill();
+
+                // Glossy Highlight
+                context.fillStyle = "rgba(255, 255, 255, 0.9)";
+                context.beginPath();
+                context.arc(size * 0.3, -size * 0.3, size * 0.4, 0, Math.PI * 2);
+                context.fill();
+
+                // 3. Splash Droplets (fake particles)
+                if (Math.random() < 0.5) {
+                    context.fillStyle = "#c7ecee";
+                    context.globalAlpha = 0.6;
+                    for (let i = 0; i < 2; i++) {
+                        const sx = -size * 2 - (Math.random() * size * 2);
+                        const sy = (Math.random() - 0.5) * size * 1.5;
+                        context.beginPath();
+                        context.arc(sx, sy, size * 0.2, 0, Math.PI * 2);
+                        context.fill();
+                    }
+                }
+                context.restore();
             }
             else if (this.effectType === 'psychic') {
-                // Psychic: Ring / Hollow Circle
-                context.arc(0, 0, size * 1.2, 0, Math.PI * 2);
-                context.fill(); // Outer glow
-                context.globalCompositeOperation = 'destination-out';
+                // Psychic: Psycho Wave (Pulsating Ripple)
+                context.save();
+
+                // Pulse Animation based on time and position
+                const pulse = Math.sin((Date.now() / 100) + this.currentX * 0.1) * 0.2 + 1.0;
+
+                // Outer Wave (Faint)
                 context.beginPath();
-                context.arc(0, 0, size * 0.6, 0, Math.PI * 2);
-                context.fill(); // Hole in middle
-                context.globalCompositeOperation = 'source-over';
+                context.arc(0, 0, size * 1.5 * pulse, 0, Math.PI * 2);
+                context.strokeStyle = "rgba(224, 86, 253, 0.4)";
+                context.lineWidth = 2;
+                context.stroke();
+
+                // Inner Wave (Strong)
+                context.beginPath();
+                context.arc(0, 0, size * 1.0 * pulse, 0, Math.PI * 2);
+                context.strokeStyle = "#e056fd";
+                context.lineWidth = 4;
+                context.shadowBlur = 10;
+                context.shadowColor = "#be2edd";
+                context.stroke();
+
+                // Core Distortion (Fill with low opacity)
+                context.fillStyle = "rgba(190, 46, 221, 0.2)";
+                context.fill();
+
+                context.restore();
             }
             else if (this.effectType === 'nova') {
                 // Nova: Diamond / Crystal
@@ -2999,7 +3062,6 @@ class ZoneEffect {
     draw(ctx) {
         ctx.save();
         ctx.translate(this.x, this.y);
-        ctx.rotate(this.rotation);
 
         // [Patch] Spike Trap Visuals
         if (this.type === 'SPIKE_TRAP') {
@@ -3026,14 +3088,67 @@ class ZoneEffect {
             return;
         }
 
+        // --- VISUAL UPDATE: Toxic Miasma (POISON_CLOUD) ---
+        if (this.type === 'POISON_CLOUD') {
+            const opacity = (this.life / this.maxLife);
+
+            // 1. Base Haze (Gradient)
+            const grad = ctx.createRadialGradient(0, 0, this.radius * 0.2, 0, 0, this.radius);
+            grad.addColorStop(0, `rgba(142, 68, 173, ${opacity * 0.6})`); // Purple Core
+            grad.addColorStop(0.7, `rgba(46, 204, 113, ${opacity * 0.3})`); // Greenish mid
+            grad.addColorStop(1, `rgba(0, 0, 0, 0)`); // Fade out
+
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. Swirling Gas Clouds (Rotating Noise)
+            ctx.rotate(this.rotation); // Apply slow base rotation
+
+            ctx.globalCompositeOperation = 'lighter'; // Gas blending
+            ctx.fillStyle = `rgba(155, 89, 182, ${opacity * 0.4})`;
+
+            // Draw 3 layers of "cloud blobs"
+            for (let j = 0; j < 3; j++) {
+                ctx.rotate(Math.PI * 2 / 3); // 120 degree offset
+                ctx.beginPath();
+                // Blob shape
+                const blobSize = this.radius * 0.6;
+                const blobDist = Math.sin(this.tickTimer * 0.05 + j) * (this.radius * 0.2) + (this.radius * 0.3);
+                ctx.arc(blobDist, 0, blobSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 3. Distortion/Fumes (Small particles rising)
+            ctx.fillStyle = `rgba(46, 204, 113, ${opacity * 0.5})`;
+            for (let k = 0; k < 5; k++) {
+                const fumeAngle = (this.tickTimer * 0.1) + k;
+                const fumeDist = this.radius * 0.5 + Math.sin(this.tickTimer * 0.2 + k) * 30;
+                const fumeSize = 10 + Math.sin(this.tickTimer * 0.1) * 5;
+
+                const fx = Math.cos(fumeAngle) * fumeDist;
+                const fy = Math.sin(fumeAngle) * fumeDist;
+
+                ctx.beginPath();
+                ctx.arc(fx, fy, fumeSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+            return;
+        }
+
+        // --- Default Visuals for other zones ---
+        ctx.rotate(this.rotation); // Restore rotation for standard ones
         const opacity = (this.life / this.maxLife) * 0.6;
         ctx.globalAlpha = opacity;
 
         let mainColor = "#fff";
         let subColor = "#fff";
 
-        if (this.type === 'POISON_CLOUD') { mainColor = "#8e44ad"; subColor = "#2ecc71"; }
-        else if (this.type === 'FIRE_ZONE') { mainColor = "#e74c3c"; subColor = "#f39c12"; }
+        // Removed POISON_CLOUD from here
+        if (this.type === 'FIRE_ZONE') { mainColor = "#e74c3c"; subColor = "#f39c12"; }
         else if (this.type === 'STATIC_FIELD') { mainColor = "#f1c40f"; subColor = "#66fcf1"; }
         else if (this.type === 'FREEZE_ZONE') { mainColor = "#74b9ff"; subColor = "#dfe6e9"; }
 
