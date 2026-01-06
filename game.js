@@ -3731,6 +3731,27 @@ function spawnFormation_Guard() {
 }
 
 function mainLoop() {
+    // FPS tracking (ヒートブラスト使用中のみ)
+    if (engineState.isBeamActive) {
+        if (!window._fpsTracker) {
+            window._fpsTracker = { lastTime: performance.now(), frameCount: 0 };
+        }
+
+        const now = performance.now();
+        const delta = now - window._fpsTracker.lastTime;
+        window._fpsTracker.frameCount++;
+
+        // Log every second
+        if (delta >= 1000) {
+            const fps = Math.round((window._fpsTracker.frameCount / delta) * 1000);
+            console.log(`[FPS During Heat Blast] ${fps} fps | Frame time: ${(delta / window._fpsTracker.frameCount).toFixed(2)}ms`);
+            window._fpsTracker.lastTime = now;
+            window._fpsTracker.frameCount = 0;
+        }
+    } else if (window._fpsTracker) {
+        window._fpsTracker = null; // Reset when beam is off
+    }
+
     if (engineState.isGameOver) {
         // If clear screen is shown, we stop updating but keep rendering is handled by UI overlay
         // If not clear (died), show Game Over
