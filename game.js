@@ -4032,8 +4032,9 @@ function mainLoop() {
             // If any active Aegis has barrier, block shots BEHIND the barrier line
             const activeAegis = activeEnemies.find(e => e.isActive && e.tier.id === 'AEGIS' && e.isBarrierActive);
             if (activeAegis) {
-                // Barrier Y is approx Aegis Y + 40 (visual match)
-                const barrierY = activeAegis.positionY + 40;
+                // Barrier Y is positioned below Aegis to prevent projectile hits
+                // Aegis bottom: positionY + 36, projectile size: 10, safe margin: 4
+                const barrierY = activeAegis.positionY + 50;
                 activeProjectiles.forEach(p => {
                     if (!p.isAlive) return;
                     // Check if passed barrier (Y < BarrierY, moving UP)
