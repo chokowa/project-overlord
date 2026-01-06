@@ -136,7 +136,7 @@ class GameEngine {
         this.overheatCooldownTimer = 0; // Forced cooldown duration
         this.isFiringEnabled = true; // [Hardcore] Manual fire control
         this.isBeamActive = false; // [Hardcore] Continuous beam active
-        this.beamDrainRate = 1.5; // Heat consumed per frame during beam
+        this.beamDrainRate = 2.25; // Heat consumed per frame during beam (1.5x increase for shorter duration)
         this.activeBeam = null; // Object pooling: reuse beam instance
 
         // [Hardcore] Overdrive System
@@ -1069,9 +1069,9 @@ Object.assign(GameEngine.prototype, {
                 }
             });
 
-            // Beam particles
-            if (Math.random() < 0.3) {
-                for (let i = 0; i < 5; i++) {
+            // Beam particles (reduced for performance: 30%→15%, 5→3 particles)
+            if (Math.random() < 0.15) {
+                for (let i = 0; i < 3; i++) {
                     const offset = (Math.random() - 0.5) * beamWidth;
                     const dist = Math.random() * beamLength;
                     const px = RENDER_CONSTANTS.TURRET_POS_X + Math.cos(beamAngle) * dist - Math.sin(beamAngle) * offset;
