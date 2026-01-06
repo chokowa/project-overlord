@@ -3737,22 +3737,26 @@ function mainLoop() {
             window._fpsTracker = {
                 lastTime: performance.now(),
                 frameCount: 0,
-                updateCount: 0  // Track actual game updates
+                updateCount: 0,  // Track actual game updates
+                loopCount: 0     // Track mainLoop calls
             };
         }
 
         const now = performance.now();
         const delta = now - window._fpsTracker.lastTime;
         window._fpsTracker.frameCount++;
+        window._fpsTracker.loopCount++;  // Count every mainLoop call
 
         // Log every second
         if (delta >= 1000) {
             const fps = Math.round((window._fpsTracker.frameCount / delta) * 1000);
             const ups = Math.round((window._fpsTracker.updateCount / delta) * 1000);
-            console.log(`[FPS During Heat Blast] ${fps} fps | ${ups} UPS | timeScale: ${engineState.timeScale} | isPaused: ${engineState.isPaused} | hitStopFrames: ${engineState.hitStopFrames}`);
+            const loops = Math.round((window._fpsTracker.loopCount / delta) * 1000);
+            console.log(`[mainLoop] ${loops} loops/sec | ${fps} fps | ${ups} UPS | timeScale: ${engineState.timeScale} | isPaused: ${engineState.isPaused} | hitStopFrames: ${engineState.hitStopFrames}`);
             window._fpsTracker.lastTime = now;
             window._fpsTracker.frameCount = 0;
             window._fpsTracker.updateCount = 0;
+            window._fpsTracker.loopCount = 0;
         }
     } else if (window._fpsTracker) {
         window._fpsTracker = null; // Reset when beam is off
