@@ -70,9 +70,8 @@ class DropItem {
         let icon = "?";
         if (this.itemTemplate.type === GEM_TYPES.ACTIVE) icon = "⚔️";
         else if (this.itemTemplate.type === GEM_TYPES.SUPPORT) icon = "💠";
-        else if (this.itemTemplate.type === ARTIFACT_TYPES.PARTS) icon = "🔌";
-        else if (this.itemTemplate.type === ARTIFACT_TYPES.GEAR) icon = "⚙️";
-        else if (this.itemTemplate.type === ARTIFACT_TYPES.BOSS) icon = "👑";
+        else if (this.itemTemplate.type === ARTIFACT_TYPES.RING) icon = "💍";
+        else if (this.itemTemplate.type === ARTIFACT_TYPES.AMULET) icon = "🧿";
         else if (this.itemTemplate.type === 'GOLD') icon = "💰";
 
         context.fillText(icon, 0, 1);
@@ -104,8 +103,8 @@ class GameEngine {
         this.currentLoadoutId = 1;
         /** @type {Object} */
         this.equippedArtifacts = {
-            [ARTIFACT_TYPES.PARTS]: null,
-            [ARTIFACT_TYPES.GEAR]: null
+            [ARTIFACT_TYPES.RING]: null,
+            [ARTIFACT_TYPES.AMULET]: null
         };
         this.inventory = [];
         this.activeDrops = [];
@@ -234,8 +233,8 @@ class GameEngine {
         this.altGems = [null, null, null];
         this.currentLoadoutId = 1;
         this.equippedArtifacts = {
-            [ARTIFACT_TYPES.PARTS]: null,
-            [ARTIFACT_TYPES.GEAR]: null
+            [ARTIFACT_TYPES.RING]: null,
+            [ARTIFACT_TYPES.AMULET]: null
         };
         this.inventory = [];
         this.activeDrops = [];
@@ -250,53 +249,6 @@ class GameEngine {
         this.accumulator = 0;
         const btn = document.getElementById('speed-btn');
         if (btn) btn.innerHTML = "▶️ x1.0";
-    }
-
-    addXp(amount) {
-        // Wrapper for global addExperience function if it exists, or direct logic
-        if (typeof addExperience === 'function') {
-            addExperience(amount);
-        } else {
-            this.experiencePoints += amount;
-            // Basic fallback level up check if global function missing
-            if (typeof checkLevelUp === 'function') checkLevelUp();
-        }
-    }
-
-    /** フカPay自動アイテム回収処理 */
-    processAutoCollection() {
-        // フカPayが装備されているかチェック
-        const hasFukaPay = Object.values(this.equippedArtifacts).some(artifact =>
-            artifact && artifact.id === 'fuka_pay'
-        );
-
-        if (!hasFukaPay || this.activeDrops.length === 0) return;
-
-        // フカPay装備時は全画面のアイテムを自動回収
-        for (let i = this.activeDrops.length - 1; i >= 0; i--) {
-            const drop = this.activeDrops[i];
-
-            // アイテムを回収
-            if (drop.itemTemplate.type === 'GOLD') {
-                // ゴールドの場合
-                let val = (GAME_SETTINGS.GOLD_VALUE_BASE || 25) + Math.floor(Math.random() * 10);
-                if (this.stats.gold_gain > 0) val = Math.floor(val * (1 + this.stats.gold_gain));
-                this.gold += val;
-                activeFloatingTexts.push(new FloatingText(drop.x, drop.y, `+${val} G`, "#f1c40f", 14));
-            } else {
-                // アイテムの場合
-                this.addItemToInventory(drop.itemTemplate);
-                activeFloatingTexts.push(new FloatingText(drop.x, drop.y, "AUTO!", "#3498db", 12));
-            }
-
-            // アイテムを削除
-            this.activeDrops.splice(i, 1);
-        }
-
-        // UIを更新
-        if (this.inventoryDirty) {
-            refreshInventoryInterface();
-        }
     }
 
     /** スキルツリーのステータス再計算 (Rank System対応) */
@@ -540,8 +492,8 @@ Object.assign(GameEngine.prototype, {
                 targetArray = this.altGems;
                 targetKey = idx;
             }
-            else if (slotIndex === 'PARTS' || slotIndex === 'GEAR') {
-                const typeCheck = slotIndex === 'PARTS' ? ARTIFACT_TYPES.PARTS : ARTIFACT_TYPES.GEAR;
+            else if (slotIndex === 'RING' || slotIndex === 'AMULET') {
+                const typeCheck = slotIndex === 'RING' ? ARTIFACT_TYPES.RING : ARTIFACT_TYPES.AMULET;
                 if (item.type !== typeCheck) return;
                 targetSlotRef = this.equippedArtifacts;
                 targetKey = slotIndex;
@@ -591,13 +543,13 @@ Object.assign(GameEngine.prototype, {
                 this.altGems[i] = null;
             }
         }
-        if (this.equippedArtifacts.PARTS && this.equippedArtifacts.PARTS.uuid === uuid) {
-            unequippedItem = this.equippedArtifacts.PARTS;
-            this.equippedArtifacts.PARTS = null;
+        if (this.equippedArtifacts.RING && this.equippedArtifacts.RING.uuid === uuid) {
+            unequippedItem = this.equippedArtifacts.RING;
+            this.equippedArtifacts.RING = null;
         }
-        if (this.equippedArtifacts.GEAR && this.equippedArtifacts.GEAR.uuid === uuid) {
-            unequippedItem = this.equippedArtifacts.GEAR;
-            this.equippedArtifacts.GEAR = null;
+        if (this.equippedArtifacts.AMULET && this.equippedArtifacts.AMULET.uuid === uuid) {
+            unequippedItem = this.equippedArtifacts.AMULET;
+            this.equippedArtifacts.AMULET = null;
         }
 
         if (unequippedItem) {
@@ -666,8 +618,8 @@ Object.assign(GameEngine.prototype, {
             this.inventory.forEach(i => allItems.push({ item: i, source: { type: 'INV', index: this.inventory.indexOf(i) } }));
             this.equippedGems.forEach((i, idx) => { if (i) allItems.push({ item: i, source: { type: 'MAIN', index: idx } }); });
             this.altGems.forEach((i, idx) => { if (i) allItems.push({ item: i, source: { type: 'SUB', index: idx } }); });
-            if (this.equippedArtifacts.PARTS) allItems.push({ item: this.equippedArtifacts.PARTS, source: { type: 'ART', index: 'PARTS' } });
-            if (this.equippedArtifacts.GEAR) allItems.push({ item: this.equippedArtifacts.GEAR, source: { type: 'ART', index: 'GEAR' } });
+            if (this.equippedArtifacts.RING) allItems.push({ item: this.equippedArtifacts.RING, source: { type: 'ART', index: 'RING' } });
+            if (this.equippedArtifacts.AMULET) allItems.push({ item: this.equippedArtifacts.AMULET, source: { type: 'ART', index: 'AMULET' } });
 
             allItems.forEach(entry => {
                 const key = `${entry.item.id}_${entry.item.level}`;
@@ -1128,17 +1080,8 @@ Object.assign(GameEngine.prototype, {
             let enemiesHit = 0;
 
             // Damage enemies in beam
-            // [Patch] Check for Aegis barrier
-            const activeAegis = activeEnemies.find(e => e.isActive && e.tier.id === 'AEGIS' && e.isBarrierActive);
-            const barrierY = activeAegis ? activeAegis.positionY + 50 : null;
-
             activeEnemies.forEach(enemy => {
                 if (!enemy.isActive) return;
-
-                // Skip enemies behind Aegis barrier
-                if (barrierY !== null && enemy.positionY < barrierY) {
-                    return;
-                }
 
                 enemiesChecked++;
 
@@ -2060,10 +2003,6 @@ class EnemyUnit {
         const baseSpd = (1.2 + Math.random() * 0.8);
         this.baseSpeed = baseSpd * (0.9 + (engineState.currentWaveNumber * 0.1)) * tier.speedMod;
 
-        // XP Value calculation
-        const baseXp = 50; // Base XP per enemy
-        this.xpValue = Math.floor(baseXp * tier.xpMod * waveMultiplier);
-
         this.isActive = true;
         this.flashTime = 0;
         this.burnTimer = 0;
@@ -2737,7 +2676,6 @@ class EnemyUnit {
         }
     }
 
-
     takeDamage(damage, isCritical, sourceId) {
         let finalDamage = damage;
         const artifacts = engineState.artifacts;
@@ -2748,90 +2686,67 @@ class EnemyUnit {
             finalDamage *= (giantKiller.config ? giantKiller.config.multiplier : 1.4);
         }
 
-        // Artifact: Sniper Scope
+        // Artifact: Sniper Scope (Distance Bonus: Top half of screen)
         const sniperScope = artifacts.find(a => a.id === 'sniper_scope');
-        if (this.positionY < (sniperScope ? sniperScope.config.range_y : 400) && sniperScope) {
-            finalDamage *= (sniperScope.config ? sniperScope.config.multiplier : 1.3);
+        if (sniperScope) {
+            const rangeY = sniperScope.config ? sniperScope.config.range_y : 400;
+            if (this.positionY < rangeY) {
+                finalDamage *= (sniperScope.config ? sniperScope.config.multiplier : 1.3);
+            }
         }
 
-        // Artifact: Unstable reactor (Random +20%)
-        if (artifacts.some(a => a.id === 'unstable_reactor') && Math.random() < 0.5) {
-            finalDamage *= 1.2;
-        }
-
-        // Artifact: Chaos Dice
-        if (artifacts.some(a => a.id === 'chaos_dice')) {
-            const roll = 0.5 + Math.random() * 1.5; // 0.5 ~ 2.0
-            finalDamage *= roll;
-        }
-
-        // Artifact: Oil Flask (Fire synergy)
-        if (this.burnTimer > 0 && artifacts.some(a => a.id === 'oil_flask') && sourceId !== 'burn_dot') {
-            finalDamage *= 1.5;
-        }
-
-        // Artifact: Elemental Mixer
+        // Artifact: Elemental Mixer (2+ Statuses)
         if (artifacts.some(a => a.id === 'elem_mixer')) {
             let statusCount = 0;
             if (this.burnTimer > 0) statusCount++;
+            if (this.poisonStacks > 0) statusCount++;
             if (this.freezeTimer > 0) statusCount++;
             if (this.shockTimer > 0) statusCount++;
-            if (this.poisonStacks > 0) statusCount++;
+            if (this.soakedTimer > 0) statusCount++;
             if (this.confusionTimer > 0) statusCount++;
+
             if (statusCount >= 2) finalDamage *= 1.5;
+        }
+
+        // Artifact: Oil Flask (Direct hit boost for fireball)
+        const oilFlask = artifacts.find(a => a.id === 'oil_flask');
+        if (sourceId === 'fireball' && oilFlask) {
+            finalDamage *= (oilFlask.config ? oilFlask.config.multiplier : 1.5);
         }
 
         // Artifact: Zero Crystal (Instant Kill Check)
         if (this.freezeTimer > 0 && artifacts.some(a => a.id === 'zero_crystal')) {
-            // 10% chance to execute non-boss
-            if (this.tier.id !== 'BOSS' && Math.random() < 0.1) {
-                finalDamage = this.health + 999;
-                activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY, "SHATTER!", "#74b9ff", 30));
+            // No instant kill on Bosses or Active Shielded Aegis
+            if (this.tier.id !== 'BOSS' && (!this.isBarrierActive) && Math.random() < 0.1) {
+                finalDamage = this.health + 9999;
             }
         }
 
         // [Patch] Aegis Barrier Logic
         if (this.tier.id === 'AEGIS' && this.isBarrierActive) {
-            // Only reflected shots can damage the barrier
-            if (sourceId === 'reflected') {
+            if (sourceId === 'reflected' || sourceId === 'shield_bash') {
+                // Correct counter technique
                 this.barrierHp--;
-                activeFloatingTexts.push(new FloatingText(
-                    this.positionX, this.positionY - 40,
-                    "CRACK!", "#00d2d3", 30
-                ));
+                activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY - 40, "CRACK!", "#00d2d3", 30));
                 triggerScreenShake(5, 5);
 
                 if (this.barrierHp <= 0) {
                     this.isBarrierActive = false;
-                    this.stunTimer = 180; // 3 seconds stun
-                    activeFloatingTexts.push(new FloatingText(
-                        this.positionX, this.positionY - 60,
-                        "SHATTERED!", "#fff", 40
-                    ));
-                    if (typeof createIceShatter === 'function') {
-                        createIceShatter(this.positionX, this.positionY, 100);
-                    }
+                    this.stunTimer = 180; // Stunned for 3 seconds
+                    activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY - 60, "SHATTERED!", "#fff", 40));
+                    createIceShatter(this.positionX, this.positionY, 100); // Visual FX
+                    // Vulnerable now!
                 }
-                return; // No HP damage from barrier hit
-            } else if (sourceId !== 'burn_dot' && sourceId !== 'poison_dot' &&
-                sourceId !== 'leech_dot' && sourceId !== 'meltdown' &&
-                sourceId !== 'corrosion' && sourceId !== 'plague' &&
-                sourceId !== 'glacier' && sourceId !== 'betrayal') {
-                // Block all non-DoT/non-Synergy attacks
-                activeFloatingTexts.push(new FloatingText(
-                    this.positionX, this.positionY - 30,
-                    "GUARD", "#00d2d3", 20
-                ));
-                activeParticles.push(new ParticleEffect(
-                    this.positionX, this.positionY + 20, "#00d2d3", 4
-                ));
+                return; // No HP damage from the breaking hit itself (or maybe minimal)
+            } else {
+                // Immune to everything else
+                activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY - 30, "GUARD", "#00d2d3", 20));
+                activeParticles.push(new ParticleEffect(this.positionX, this.positionY + 20, "#00d2d3", 4));
                 return; // 0 Damage
             }
-            // DoT and Synergy attacks bypass barrier and continue to damage calculation
         }
 
-        // Apply Status Multipliers
-        // Dr. Xeno: Shock Multiplier
+        // Shock Multiplier
         if (this.shockTimer > 0) {
             finalDamage *= this.shockMultiplier;
         }
@@ -2880,33 +2795,6 @@ class EnemyUnit {
         const displayText = isCritical ? `${Math.floor(finalDamage)}!` : `${Math.floor(finalDamage)}`;
         activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY - 20, displayText, popupColor, fontSize));
         audioManager.play('HIT');
-
-        // Death Check & Logic
-        if (this.health <= 0) {
-            this.health = 0;
-            if (this.isActive) {
-                this.isActive = false;
-
-                // XP Gain (Using new wrapper)
-                engineState.addXp(this.xpValue);
-
-                // Drop Generation
-                if (Math.random() < GAME_SETTINGS.DROP_CHANCE) {
-                    generateDrop(this.positionX, this.positionY);
-                }
-
-                // Effects
-                audioManager.play('EXPLOSION');
-                // Explosion effect logic (simplified call if function exists, else inline)
-                // Assuming createExplosion is global
-                if (typeof createExplosion === 'function') createExplosion(this.positionX, this.positionY, this.tier.color);
-
-                activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY, `+${Math.floor(this.xpValue)} XP`, "#f1c40f", 20));
-
-                // Callback for progression
-                engineState.checkProgression(this);
-            }
-        }
     }
 
     draw(context) {
@@ -3097,8 +2985,6 @@ class EnemyUnit {
         context.restore();
     }
 }
-
-
 
 class ZoneEffect {
     constructor(x, y, type, config) {
@@ -4085,9 +3971,8 @@ function mainLoop() {
             // If any active Aegis has barrier, block shots BEHIND the barrier line
             const activeAegis = activeEnemies.find(e => e.isActive && e.tier.id === 'AEGIS' && e.isBarrierActive);
             if (activeAegis) {
-                // Barrier Y is positioned below Aegis to prevent projectile hits
-                // Aegis bottom: positionY + 36, projectile size: 10, safe margin: 4
-                const barrierY = activeAegis.positionY + 50;
+                // Barrier Y is approx Aegis Y + 40 (visual match)
+                const barrierY = activeAegis.positionY + 40;
                 activeProjectiles.forEach(p => {
                     if (!p.isAlive) return;
                     // Check if passed barrier (Y < BarrierY, moving UP)
@@ -4100,10 +3985,6 @@ function mainLoop() {
                 });
             }
             engineState.activeDrops.forEach(drop => drop.update());
-
-            // [Feature] Fuka Pay Auto-Collection
-            engineState.processAutoCollection();
-
 
             activeEnemies = activeEnemies.filter(e => e.isActive);
             activeEnemies.forEach(enemy => {
@@ -4641,21 +4522,7 @@ function generateDrop(positionX, positionY) {
 
     // 2. アイテムドロッププールの構築
     const itemPool = [];
-    let allTemplates = [...Object.values(GEMS), ...Object.values(ARTIFACTS)];
-
-    // [Patch] Filter out already owned Unique items (Parts, Gear, Boss)
-    const ownedArtifactIds = [
-        ...Object.values(engineState.equippedArtifacts).filter(a => a).map(a => a.id),
-        ...engineState.inventory.filter(i => i.type === ARTIFACT_TYPES.PARTS || i.type === ARTIFACT_TYPES.GEAR || i.type === ARTIFACT_TYPES.BOSS).map(i => i.id),
-        ...engineState.artifacts.map(a => a.id)
-    ];
-
-    allTemplates = allTemplates.filter(t => {
-        if (t.type === ARTIFACT_TYPES.PARTS || t.type === ARTIFACT_TYPES.GEAR || t.type === ARTIFACT_TYPES.BOSS) {
-            return !ownedArtifactIds.includes(t.id);
-        }
-        return true;
-    });
+    const allTemplates = [...Object.values(GEMS), ...Object.values(ARTIFACTS)];
 
     // 現在の装備状況を確認
     const currentEquippedItems = [...engineState.equippedGems, ...engineState.altGems].filter(itemInstance => itemInstance !== null);

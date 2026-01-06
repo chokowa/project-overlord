@@ -245,7 +245,8 @@ export const GEMS = {
 // パーツ/ギアスロット装備品（コード上の名前は ARTIFACTS だがゲーム内では「アーティファクト」とは呼ばない）
 // ゲーム内では装備スロット名（パーツ/ギア）で区別される
 export const ARTIFACTS = {
-    // 【削除予定】以下の4アイテムは将来削除される
+    // 【削除予定】以下の4アイテムは将来削除される -> 削除済み(コメントアウト)
+    /*
     RUBY_RING: {
         id: 'ruby_ring', name: '赤の指輪', type: ARTIFACT_TYPES.PARTS,
         color: '#c0392b', description: "ダメージ +15%",
@@ -266,6 +267,7 @@ export const ARTIFACTS = {
         color: '#f39c12', description: "XP獲得量 +20%",
         stats: { xp_gain: 0.20 }
     },
+    */
     // --- PARTS（パーツスロット装備品）---
     HIGH_CAPACITY: {
         id: 'high_capacity', name: '大容量コンデンサ', type: ARTIFACT_TYPES.PARTS,
