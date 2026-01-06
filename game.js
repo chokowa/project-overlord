@@ -3734,7 +3734,11 @@ function mainLoop() {
     // FPS tracking (ヒートブラスト使用中のみ)
     if (engineState.isBeamActive) {
         if (!window._fpsTracker) {
-            window._fpsTracker = { lastTime: performance.now(), frameCount: 0 };
+            window._fpsTracker = {
+                lastTime: performance.now(),
+                frameCount: 0,
+                updateCount: 0  // Track actual game updates
+            };
         }
 
         const now = performance.now();
@@ -3744,9 +3748,11 @@ function mainLoop() {
         // Log every second
         if (delta >= 1000) {
             const fps = Math.round((window._fpsTracker.frameCount / delta) * 1000);
-            console.log(`[FPS During Heat Blast] ${fps} fps | Frame time: ${(delta / window._fpsTracker.frameCount).toFixed(2)}ms | timeScale: ${engineState.timeScale} | accumulator: ${engineState.accumulator.toFixed(2)} | isPaused: ${engineState.isPaused}`);
+            const ups = Math.round((window._fpsTracker.updateCount / delta) * 1000);
+            console.log(`[FPS During Heat Blast] ${fps} fps | ${ups} UPS (updates/sec) | Frame time: ${(delta / window._fpsTracker.frameCount).toFixed(2)}ms | timeScale: ${engineState.timeScale} | isPaused: ${engineState.isPaused}`);
             window._fpsTracker.lastTime = now;
             window._fpsTracker.frameCount = 0;
+            window._fpsTracker.updateCount = 0;
         }
     } else if (window._fpsTracker) {
         window._fpsTracker = null; // Reset when beam is off
@@ -3781,6 +3787,11 @@ function mainLoop() {
 
         while (engineState.accumulator >= 1.0) {
             engineState.accumulator -= 1.0;
+
+            // Track update count for performance monitoring
+            if (window._fpsTracker) {
+                window._fpsTracker.updateCount++;
+            }
 
             // --- Core Update Logic ---
             if (engineState.timeStopTimer > 0) {
