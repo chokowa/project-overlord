@@ -899,8 +899,8 @@ export function refreshInventoryInterface() {
     const accRow = document.createElement('div');
     accRow.className = 'acc-row';
     accRow.style.margin = "5px 0"; // Reduce margin
-    accRow.appendChild(createSlot('slot-ring', engineState.equippedArtifacts.RING, "指輪", "RING", "RING"));
-    accRow.appendChild(createSlot('slot-amulet', engineState.equippedArtifacts.AMULET, "首飾り", "AMULET", "AMULET"));
+    accRow.appendChild(createSlot('slot-parts', engineState.equippedArtifacts.PARTS, "パーツ", "PARTS", "PARTS"));
+    accRow.appendChild(createSlot('slot-gear', engineState.equippedArtifacts.GEAR, "ギア", "GEAR", "GEAR"));
     stickyHeader.appendChild(accRow);
 
     // Append sticky header to container
