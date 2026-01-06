@@ -258,7 +258,30 @@ export const ARTIFACTS = {
         id: 'gold_amulet', name: '黄金の首飾り', type: ARTIFACT_TYPES.AMULET,
         color: '#f39c12', description: "XP獲得量 +20%",
         stats: { xp_gain: 0.20 }
-    }
+    },
+    // --- PARTS (Physical Enhancements) ---
+    HIGH_CAPACITY: {
+        id: 'high_capacity', name: '大容量コンデンサ', type: ARTIFACT_TYPES.PARTS,
+        color: '#f39c12', description: "ヒート効率 +30%",
+        stats: { heat_efficiency: 0.30 }
+    },
+    STABILIZER: {
+        id: 'stabilizer', name: '精密スタビライザー', type: ARTIFACT_TYPES.PARTS,
+        color: '#95a5a6', description: "予測射撃 (偏差)",
+        stats: { predictive_aim: 1 }
+    },
+
+    // --- GEAR (Tactical/Digital Enhancements) ---
+    HEADBAND: {
+        id: 'headband', name: '気合ハチマキ', type: ARTIFACT_TYPES.GEAR,
+        color: '#e74c3c', description: "強敵(MaxHP)優先",
+        stats: { target_priority: 'MAX_HP' }
+    },
+    FUKA_PAY: {
+        id: 'fuka_pay', name: 'フカPay', type: ARTIFACT_TYPES.GEAR,
+        color: '#3498db', description: "自動アイテム回収",
+        stats: { auto_collect: 1 }
+    },
 };
 
 export const SKILL_TREE_NODES = {

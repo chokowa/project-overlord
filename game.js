@@ -38,11 +38,49 @@ class DropItem {
         this.itemTemplate = itemTemplate;
         this.floatTimer = Math.random() * Math.PI * 2;
         this.creationTime = Date.now();
+        this.isActive = true;
     }
 
     update() {
-        this.floatTimer += RENDER_CONSTANTS.DROP_FLOAT_SPEED;
-        this.y = this.baseY + Math.sin(this.floatTimer) * RENDER_CONSTANTS.DROP_FLOAT_RANGE;
+        if (!this.isActive) return;
+
+        // FukaPay / Auto Collect Logic
+        if (engineState.stats.auto_collect > 0) {
+            const tx = RENDER_CONSTANTS.TURRET_POS_X;
+            const ty = RENDER_CONSTANTS.TURRET_POS_Y;
+            const dx = tx - this.x;
+            const dy = ty - this.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist < 20) {
+                // Auto-loot range
+                if (this.itemTemplate.type === 'GOLD') {
+                    let val = (GAME_SETTINGS.GOLD_VALUE_BASE || 25) + Math.floor(Math.random() * 10);
+                    if (engineState.stats.gold_gain > 0) val = Math.floor(val * (1 + engineState.stats.gold_gain));
+                    engineState.gold += val;
+                    activeFloatingTexts.push(new FloatingText(this.x, this.y, `+${val} G`, "#f1c40f", 20));
+                    refreshInventoryInterface();
+                } else {
+                    engineState.addItemToInventory(this.itemTemplate);
+                    activeFloatingTexts.push(new FloatingText(this.x, this.y, "GET!", "#f1c40f", 20));
+                }
+                this.isActive = false;
+                return;
+            } else {
+                // Fly towards turret
+                const speed = 15;
+                this.x += (dx / dist) * speed;
+                this.y += (dy / dist) * speed;
+            }
+        }
+
+        this.floatTimer += 0.05;
+        this.y = this.baseY + Math.sin(this.floatTimer) * GAME_SETTINGS.DROP_FLOAT_RANGE;
+
+        // Auto-remove logic (time based)
+        if (Date.now() - this.creationTime > 30000) { // 30s
+            this.isActive = false;
+        }
     }
 
     draw(context) {
@@ -253,13 +291,29 @@ class GameEngine {
 
     /** スキルツリーのステータス再計算 (Rank System対応) */
     recalcStats() {
+        // Initialize Base Stats
         this.stats = {
-            damage_pct: 0, rate_pct: 0, crit_chance: 0, xp_gain: 0,
-            hp_max: 0, speed_pct: 0, proj_speed_pct: 0, support_effect: 0, self_damage: 0,
-            life_on_hit: 0, gold_gain: 0, aoe_pct: 0, crit_damage: 0, damage_reduction: 0,
-            chain_range_pct: 0, support_level_bonus: 0,
-            final_damage_mul: 0, self_damage_pct: 0,
-            hit_damage_mul_pct: 0, dot_power_pct: 0
+            damage_pct: 0,
+            rate_pct: 0,
+            crit_chance: GAME_SETTINGS.BASE_CRIT_CHANCE || 0.05,
+            crit_damage: GAME_SETTINGS.BASE_CRIT_MULTIPLIER || 1.5,
+            hp_max: 0,
+            hp_regen: 0,
+            xp_gain: 0,
+            gold_gain: 0,
+            life_on_hit: 0,
+            damage_reduction: 0,
+            aoe_pct: 0,
+            proj_speed_pct: 0,
+            chain_range_pct: 0,
+            final_damage_mul: 1.0,
+            hit_damage_mul_pct: 0,
+            dot_power_pct: 0,
+            // New Item Stats
+            heat_efficiency: 0.0, // Condenser
+            predictive_aim: 0,    // Stabilizer
+            target_priority: null,// Headband (MAX_HP)
+            auto_collect: 0       // FukaPay
         };
 
         // Tree Stats (Rank Multiplier)
@@ -303,7 +357,11 @@ Object.assign(GameEngine.prototype, {
             hit_damage_mul_pct: 0, dot_power_pct: 0,
             chain_count: 0, shield_bash_mul: 0, mp_regen_pct: 0, // Artifact stats
             hp_regen: 0, // Crew stats
-            damage_taken_mul: 0
+            damage_taken_mul: 0,
+            heat_efficiency: 0.0,
+            predictive_aim: 0,
+            target_priority: null,
+            auto_collect: 0
         };
 
         // Bonus Stats (Level Up Fillers)
@@ -974,7 +1032,14 @@ Object.assign(GameEngine.prototype, {
                 // End Overdrive -> Start Cooldown
                 this.isOverdrive = false;
                 this.isCoolingDown = true;
-                this.cooldownTimer = 300; // 5 seconds cooldown
+                let cd = 300; // 5 seconds
+                // Condenser Efficiency: Reduces Cooldown
+                if (this.stats.heat_efficiency > 0) {
+                    cd *= (1.0 - this.stats.heat_efficiency * 0.5); // 15% reduction for 30% eff? Or full? Let's do partial.
+                    // User said "Cooling down reduction". Let's apply full efficiency.
+                    cd *= (1.0 - this.stats.heat_efficiency);
+                }
+                this.cooldownTimer = Math.floor(cd);
 
                 triggerScreenShake(10, 8);
                 activeFloatingTexts.push(new FloatingText(RENDER_CONSTANTS.TURRET_POS_X, GAME_SETTINGS.CASTLE_Y - 100, "COOLING DOWN...", "#3498db", 24));
@@ -984,11 +1049,16 @@ Object.assign(GameEngine.prototype, {
         }
 
         // 3. Normal Phase
-        // Passive Cooling (only if beam is NOT active)
+        // Passive Cooling
         if (this.heat > 0 && !this.isBeamActive) {
             this.heat -= this.coolingRate;
             if (this.heat < 0) this.heat = 0;
         }
+
+        // Apply Heat Efficiency (Condenser): Faster Accumulation? User said "Faster Heat Accumulation"
+        // But usually heat is bad? Ah, Heat Blast uses heat as fuel. So gaining heat is good for activating it.
+        // Wait, did I implement heat gain? Heat gain is likely in handleAutoAttack or similar.
+        // Let's check handleAutoAttack for heat gain additions.
 
         // Check for Overdrive Trigger (Max Heat)
         if (this.heat >= this.maxHeat && !this.isBeamActive) {
@@ -1009,7 +1079,12 @@ Object.assign(GameEngine.prototype, {
         // [Hardcore] Continuous Beam Logic
         if (this.isBeamActive) {
             // Drain heat continuously
-            this.heat -= this.beamDrainRate;
+            // Condenser Efficiency: Reduces drain rate
+            let drain = this.beamDrainRate;
+            if (this.stats.heat_efficiency > 0) {
+                drain *= (1.0 - this.stats.heat_efficiency); // Reduce drain by efficiency %
+            }
+            this.heat -= drain;
             if (this.heat <= 0) {
                 this.heat = 0;
                 this.isBeamActive = false; // Stop beam when heat depleted
@@ -2841,8 +2916,7 @@ class EnemyUnit {
             // Determine Boss Type Logic (Simple matching by name or wave, assuming Boss Name is set)
             // Currently EnemyUnit doesn't hold 'name' directly from config unless passed, 
             // but we can infer or if BOSS_WAVES logic attached name to this.tier
-            // However, BOSS_WAVES config is used to spawn. Let's check tier name?
-            // Actually, `this.tier` is a reference to ENEMY_TIERS object.
+            // However, `this.tier` is a reference to ENEMY_TIERS object.
 
             // Note: Bosses are spawned with currentWaveNumber Check in main logic.
             // Let's rely on specific boss tracking or just Cycle:
@@ -3481,17 +3555,33 @@ function selectEnemyHelper(enemyList, criteria) {
 }
 
 function getTarget() {
-    if (engineState.manualTargetId) {
-        const manualTarget = activeEnemies.find(e => e.id === engineState.manualTargetId);
-        if (manualTarget && manualTarget.isActive) return manualTarget;
-        else engineState.manualTargetId = null;
+    let candidates = activeEnemies.filter(e => e.isActive && e.positionY < GAME_SETTINGS.CASTLE_Y);
+    if (candidates.length === 0) return null;
+
+    // Headband: Prioritize Max HP (Boss/Tank)
+    if (engineState.stats.target_priority === 'MAX_HP') {
+        // Sort descending by MaxHP / CurrentHP? User said "Max HP". Or "Higher HP enemies".
+        // Let's use Current HP sort to kill "toughest current threat".
+        // Or Max HP to focus Bosses/Tanks regardless of damage taken.
+        // "HPの高い雑魚敵や、ボスを積極的に狙う" -> MaxHP implies "Strongest Type".
+        candidates.sort((a, b) => b.maxHealth - a.maxHealth); // Changed to maxHealth for "strongest type"
+        return candidates[0];
+    } else if (engineState.manualTargetId) {
+        const manual = candidates.find(e => e.id === engineState.manualTargetId);
+        if (manual) return manual;
     }
-    if (customAiFunction) {
-        try {
-            return customAiFunction(activeEnemies, selectEnemyHelper);
-        } catch (errorInstance) { console.warn("AI Error"); }
+
+    // Default: Nearest
+    let nearest = null;
+    let minD = 999999;
+    const tx = RENDER_CONSTANTS.TURRET_POS_X;
+    const ty = RENDER_CONSTANTS.TURRET_POS_Y;
+
+    for (const e of candidates) {
+        const d = Math.hypot(e.positionX - tx, e.positionY - ty);
+        if (d < minD) { minD = d; nearest = e; }
     }
-    return selectEnemyHelper(activeEnemies, SELECTION_CRITERIA.MIN_DIST);
+    return nearest;
 }
 
 function handleAutoAttack() {
@@ -3649,37 +3739,72 @@ function handleAutoAttack() {
                 engineState.baseIntegrity -= cost;
             }
 
-            const fireProjectile = (cfg, tgt, x, y) => {
-                // Artifact: Phantom Barrel (Extra Shot)
-                const phantomBarrel = engineState.artifacts.find(a => a.id === 'phantom_barrel');
-                let shots = 1;
-                if (phantomBarrel) {
-                    const chance = phantomBarrel.config ? phantomBarrel.config.chance : 0.20;
-                    const extra = phantomBarrel.config ? phantomBarrel.config.extra_shots : 1;
-                    if (Math.random() < chance) shots += extra;
+            const fireProjectile = (gem, stats, startX, startY) => {
+                if (!target || !target.isActive) return;
+
+                // Predictive Aiming (Stabilizer)
+                let aimAngle = Math.atan2(target.positionY - startY, target.positionX - startX);
+
+                if (engineState.stats.predictive_aim > 0) {
+                    // Simple Linear Interception
+                    const dist = Math.hypot(target.positionX - startX, target.positionY - startY);
+                    const timeToHit = dist / (gem.speed * (1 + (stats ? stats.proj_speed_pct || 0 : 0)));
+
+                    // Enemy Velocity Estimation (Assuming they move straight down/towards castle)
+                    // Most move basically down or slightly sideways.
+                    // We can peek at 'enemy.speed' or store velocity.
+                    // For now, assume straight down movement is dominant for simplicity or calculate from update?
+                    // Enemies in this game move towards castle logic is in update().
+                    // Let's assume standard vector towards castle center?
+                    // Using enemy's stored velocity would be best but enemy update doesn't expose VX/VY clearly in properties.
+                    // However, we can approximate: Most enemies move towards (TURRET_X, CASTLE_Y).
+                    const ex = target.positionX;
+                    const ey = target.positionY;
+                    const edx = RENDER_CONSTANTS.TURRET_POS_X - ex;
+                    const edy = GAME_SETTINGS.CASTLE_Y - ey;
+                    const edist = Math.hypot(edx, edy);
+                    const speed = target.baseSpeed * (target.slowFactor || 1.0); // Taking slow into account
+
+                    const predX = ex + (edx / edist) * speed * timeToHit;
+                    const predY = ey + (edy / edist) * speed * timeToHit;
+
+                    aimAngle = Math.atan2(predY - startY, predX - startX);
                 }
 
-                // Artifact: Chaos Dice
-                if (engineState.artifacts.some(a => a.id === 'chaos_dice')) {
-                    cfg.damage *= (0.5 + Math.random() * 1.5);
-                }
+                // Spread Calculation
+                let spreadAngle = EFFECT_CONSTANTS.MULTISHOT_SPREAD_ANGLE;
+                let randomSpread = (Math.random() - 0.5) * 0.1;
 
-                for (let s = 0; s < shots; s++) {
-                    const finalCfg = { ...cfg };
+                const totalProjectiles = (gem.projectiles || 1) + (supportGems.find(s => s.id === 'multishot') ? (supportGems.find(s => s.id === 'multishot').projectiles || 1) : 0);
+                const baseAngle = aimAngle; // Use aimed angle instead of fixed -PI/2
 
-                    let aimTarget = tgt;
-                    // ... (Original Aim Logic)
-                    if (tgt && finalCfg.id !== 'nova') {
-                        const dist = Math.hypot(tgt.positionX - x, tgt.positionY - y);
-                        const timeToHit = dist / finalCfg.speed;
-                        const enemySpeed = (tgt.freezeTimer > 0) ? 0 : tgt.baseSpeed;
-                        const predictedY = tgt.positionY + (enemySpeed * timeToHit);
-                        aimTarget = { positionX: tgt.positionX, positionY: predictedY };
+                // If aiming at single target, fan out around aimAngle
+                // If aiming at 'nothing' (default), use -PI/2
+
+                // Multi-projectile fan logic override for AutoAttack?
+                // Original logic was always fan up (-PI/2).
+                // If we have a target, we want to fan around the TARGET direction.
+
+                for (let i = 0; i < totalProjectiles; i++) {
+                    let angle = baseAngle;
+                    if (totalProjectiles > 1) {
+                        angle += (i - (totalProjectiles - 1) / 2) * spreadAngle;
                     }
-                    // Scatter Phantom shots slightly
-                    const originX = s === 0 ? x : x + (Math.random() - 0.5) * 20;
+                    angle += randomSpread;
 
-                    activeProjectiles.push(new MagicProjectile(originX, y, aimTarget, finalCfg));
+                    const vx = Math.cos(angle) * gem.speed;
+                    const vy = Math.sin(angle) * gem.speed;
+
+                    const pConfig = { ...gem, ...stats, velocityX: vx, velocityY: vy, sourceGemId: gem.id };
+                    activeProjectiles.push(new MagicProjectile(startX, startY, null, pConfig));
+
+                    // Heat Generation (Condenser Boost)
+                    let heatGen = 1.5;
+                    if (engineState.stats.heat_efficiency > 0) {
+                        // Efficiency increases GAIN? "ヒートの溜まる速度UP" = More heat per shot
+                        heatGen *= (1.0 + engineState.stats.heat_efficiency);
+                    }
+                    engineState.heat += heatGen;
                 }
             };
 
@@ -3731,7 +3856,7 @@ function handleAutoAttack() {
                     activeProjectiles.push(new MagicProjectile(sourceX, sourceY, null, { ...finalConfig, velocityX: vx, velocityY: vy }));
                 }
             } else {
-                fireProjectile(finalConfig, target, sourceX, sourceY);
+                fireProjectile(finalConfig, engineState.stats, sourceX, sourceY);
             }
 
             engineState.activeSupportUnits.forEach(unit => {

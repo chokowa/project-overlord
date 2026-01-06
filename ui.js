@@ -757,8 +757,53 @@ export function refreshInventoryInterface() {
         if (typeHint === 'ACTIVE') el.classList.add('slot-active-bg');
         if (typeHint === 'SUPPORT') el.classList.add('slot-support-bg');
 
+        // Styles for relative positioning
+        el.style.position = 'relative';
+
         if (item) {
-            el.innerHTML = `<div style="text-align:center; color:${item.color}; line-height:1.1;">${item.name}<br><span style="font-size:9px; color:#fff;">Lv.${item.level}</span></div>`;
+            // Image Mapping (Simple)
+            const imgMap = {
+                'fireball': 'assets/FB.png',
+                'arrow': 'assets/AR.png',
+                'electric': 'assets/EL.png',
+                'poison': 'assets/PO.png',
+                'plant': 'assets/PL.png',
+                'rock': 'assets/RC.png',
+                'water': 'assets/WA.png',
+                'psychic': 'assets/PY.png',
+                'nova': 'assets/NB.png',
+                // Supports
+                'multishot': 'assets/MS.png',
+                'power': 'assets/PW.png',
+                'speed': 'assets/SP.png',
+                'pierce': 'assets/PI.png',
+                'chain': 'assets/CH.png'
+            };
+            const imgSrc = imgMap[item.id];
+
+            // Icons
+            let typeIcon = '';
+            if (item.type === 'ACTIVE') typeIcon = '⚔️';
+            else if (item.type === 'SUPPORT') typeIcon = '💠';
+            else if (item.type === 'RING') typeIcon = '💍';
+            else if (item.type === 'AMULET') typeIcon = '🧿';
+
+            // Central Visual (Image or Large Icon)
+            let centerVisual = '';
+            if (imgSrc) {
+                centerVisual = `<img src="${imgSrc}" style="width:80%; height:80%; object-fit:contain; drop-shadow:0 0 4px ${item.color};">`;
+            } else {
+                // Fallback to large emoji
+                centerVisual = `<div style="font-size:24px;">${typeIcon}</div>`;
+            }
+
+            el.innerHTML = `
+                <div style="position:absolute; top:2px; left:2px; font-size:10px; line-height:1; opacity:0.8;">${typeIcon}</div>
+                <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; padding-top:4px;">
+                    ${centerVisual}
+                </div>
+                <div style="position:absolute; bottom:1px; right:2px; font-size:9px; font-weight:bold; color:#fff; text-shadow:1px 1px 0 #000; line-height:1;">Lv.${item.level}</div>
+            `;
             el.style.borderColor = item.color;
             el.draggable = true;
             el.ondragstart = (e) => window.handleDragStart(e, item.uuid);
@@ -770,7 +815,7 @@ export function refreshInventoryInterface() {
             el.onmousemove = (e) => window.moveTooltip(e);
             el.onmouseleave = () => window.hideTooltip();
         } else {
-            el.innerText = label;
+            el.innerHTML = `<div style="font-size:10px; color:#aaa; text-align:center;">${label}</div>`;
             if (typeHint === 'ACTIVE') el.style.borderColor = '#c0392b';
             else if (typeHint === 'SUPPORT') el.style.borderColor = '#27ae60';
             else el.style.borderColor = '#444';
@@ -915,18 +960,50 @@ export function refreshInventoryInterface() {
         }
 
         // Icon Logic
-        let icon = '?';
-        if (item.type === 'ACTIVE') icon = '⚔️';
-        else if (item.type === 'SUPPORT') icon = '💠';
-        else if (item.type === 'RING') icon = '💍';
-        else if (item.type === 'AMULET') icon = '🧿';
-        else if (item.id === 'gold') icon = '💰';
+        let typeIcon = '?';
+        if (item.type === 'ACTIVE') typeIcon = '⚔️';
+        else if (item.type === 'SUPPORT') typeIcon = '💠';
+        else if (item.type === 'RING') typeIcon = '💍';
+        else if (item.type === 'AMULET') typeIcon = '🧿';
+        else if (item.id === 'gold') typeIcon = '💰';
+
+        // Image Mapping (Simple)
+        const imgMap = {
+            'fireball': 'assets/FB.png',
+            'arrow': 'assets/AR.png',
+            'electric': 'assets/EL.png',
+            'poison': 'assets/PO.png',
+            'plant': 'assets/PL.png',
+            'rock': 'assets/RC.png',
+            'water': 'assets/WA.png',
+            'psychic': 'assets/PY.png',
+            'nova': 'assets/NB.png',
+            // Supports
+            'multishot': 'assets/MS.png',
+            'power': 'assets/PW.png',
+            'speed': 'assets/SP.png',
+            'pierce': 'assets/PI.png',
+            'chain': 'assets/CH.png'
+        };
+        const imgSrc = imgMap[item.id];
+
+        // Central Visual (Image or Large Icon)
+        let centerVisual = '';
+        if (imgSrc) {
+            centerVisual = `<img src="${imgSrc}" style="width:80%; height:80%; object-fit:contain; drop-shadow:0 0 4px ${item.color};">`;
+        } else {
+            // Fallback to large emoji
+            centerVisual = `<div style="font-size:24px;">${typeIcon}</div>`;
+        }
 
         // Rich Content: Icon + Name
+        slot.style.position = 'relative';
         slot.innerHTML = `
-            <div style="font-size:14px;">${icon}</div>
-            <div class="inv-name" style="color:${item.color}">${item.name}</div>
-            <span style="font-size:8px; color:#aaa; position:absolute; top:2px; right:2px;">Lv.${item.level}</span>
+            <div style="position:absolute; top:2px; left:2px; font-size:10px; line-height:1; opacity:0.8;">${typeIcon}</div>
+            <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; padding-top:4px;">
+                ${centerVisual}
+            </div>
+            <div style="position:absolute; bottom:1px; right:2px; font-size:9px; font-weight:bold; color:#fff; text-shadow:1px 1px 0 #000; line-height:1;">Lv.${item.level}</div>
         `;
 
         slot.draggable = true;
