@@ -1809,12 +1809,50 @@ class MagicProjectile {
                 context.restore();
             }
             else if (this.effectType === 'nova') {
-                // Nova: Diamond / Crystal
-                context.moveTo(size, 0);
-                context.lineTo(0, size);
-                context.lineTo(-size, 0);
-                context.lineTo(0, -size);
-                context.closePath();
+                // Nova: Snow Crystal (Hexagonal)
+                context.save();
+                // Spin animation: Rotate relative to the current trajectory
+                const spin = Date.now() / 150;
+                context.rotate(spin);
+
+                context.strokeStyle = "#ffffff";
+                context.lineWidth = 2;
+                context.lineCap = 'round';
+                context.shadowColor = "#74b9ff";
+                context.shadowBlur = 8;
+
+                // Draw 6 crystal branches
+                for (let i = 0; i < 6; i++) {
+                    context.rotate(Math.PI / 3); // 60 degrees
+
+                    // Main Branch
+                    context.beginPath();
+                    context.moveTo(0, 0);
+                    context.lineTo(0, size * 1.8);
+                    context.stroke();
+
+                    // Ice Ferns (Sub-branches)
+                    context.beginPath();
+                    context.moveTo(-size * 0.4, size * 1.0);
+                    context.lineTo(0, size * 1.2);
+                    context.lineTo(size * 0.4, size * 1.0);
+                    context.stroke();
+
+                }
+
+                // Center Core (Frozen Gem)
+                context.fillStyle = "#dfe6e9";
+                context.beginPath();
+                context.arc(0, 0, size * 0.4, 0, Math.PI * 2);
+                context.fill();
+
+                // Outer chill aura
+                context.fillStyle = "rgba(116, 185, 255, 0.3)";
+                context.beginPath();
+                context.arc(0, 0, size * 1.2, 0, Math.PI * 2);
+                context.fill();
+
+                context.restore();
             }
             else {
                 // Default: Circle
