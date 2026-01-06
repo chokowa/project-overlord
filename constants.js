@@ -270,11 +270,13 @@ export const ARTIFACTS = {
     HIGH_CAPACITY: {
         id: 'high_capacity', name: '大容量コンデンサ', type: ARTIFACT_TYPES.PARTS,
         color: '#f39c12', description: "ヒート効率 +30%",
+        iconImage: 'assets/high_capacity.png',
         stats: { heat_efficiency: 0.30 }
     },
     STABILIZER: {
         id: 'stabilizer', name: '精密スタビライザー', type: ARTIFACT_TYPES.PARTS,
         color: '#95a5a6', description: "予測射撃 (偏差)",
+        iconImage: 'assets/stabilizer.png',
         stats: { predictive_aim: 1 }
     },
 
@@ -282,12 +284,14 @@ export const ARTIFACTS = {
     HEADBAND: {
         id: 'headband', name: '気合ハチマキ', type: ARTIFACT_TYPES.GEAR,
         color: '#e74c3c', description: "強敵(MaxHP)優先",
+        iconImage: 'assets/headband.png',
         stats: { target_priority: 'MAX_HP' }
     },
     FUKA_PAY: {
         id: 'fuka_pay', name: 'フカPay', type: ARTIFACT_TYPES.GEAR,
-        color: '#3498db', description: "自動アイテム回収",
-        stats: { auto_collect: 1 }
+        color: '#3498db', description: "全アイテム自動回収",
+        iconImage: 'assets/fuka_pay.png',
+        auto_collect: 1
     },
 };
 
