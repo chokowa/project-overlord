@@ -162,8 +162,8 @@ class GameEngine {
         this.bonusStats = {};      // Permanent stats from Level Up choices
 
         // [Patch] Game Speed Control
-        this.timeScale = 0.7; // Default 0.7 (Slow)
-        this.speedLevel = 0;  // 0: x0.7, 1: x1.0, 2: x2.0
+        this.timeScale = 1.0; // Changed from 0.7 to 1.0 for normal speed
+        this.speedLevel = 1;  // 0: x0.7, 1: x1.0, 2: x2.0
         this.accumulator = 0;
 
         // [Stats for Results]
