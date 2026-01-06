@@ -1163,7 +1163,8 @@
         <!-- [Hardcore] Heat Blast Button (Above shield orb, below Crew HUD) -->
         <div class="side-hud-btn"
             style="bottom:calc(135px + env(safe-area-inset-bottom)); right:10px; border-color:#f39c12; color:#f39c12;"
-            onclick="engineState.triggerHeatBlast()" id="heat-blast-btn">⚡</div>
+            onclick="if (!this.classList.contains('disabled')) engineState.triggerHeatBlast()" id="heat-blast-btn">⚡
+        </div>
 
         <div id="upgrade-selection-modal" class="modal-overlay hidden">
             <h2 style="color:#f1c40f; text-shadow:0 0 10px orange; margin-bottom:20px;">レベルアップ！</h2>
