@@ -2777,6 +2777,30 @@ class EnemyUnit {
             }
         }
 
+        // [Patch] Aegis Barrier Logic
+        if (this.tier.id === 'AEGIS' && this.isBarrierActive) {
+            if (sourceId === 'reflected' || sourceId === 'shield_bash') {
+                // Correct counter technique
+                this.barrierHp--;
+                activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY - 40, "CRACK!", "#00d2d3", 30));
+                triggerScreenShake(5, 5);
+
+                if (this.barrierHp <= 0) {
+                    this.isBarrierActive = false;
+                    this.stunTimer = 180; // Stunned for 3 seconds
+                    activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY - 60, "SHATTERED!", "#fff", 40));
+                    createIceShatter(this.positionX, this.positionY, 100); // Visual FX
+                    // Vulnerable now!
+                }
+                return; // No HP damage from the breaking hit itself (or maybe minimal)
+            } else {
+                // Immune to everything else
+                activeFloatingTexts.push(new FloatingText(this.positionX, this.positionY - 30, "GUARD", "#00d2d3", 20));
+                activeParticles.push(new ParticleEffect(this.positionX, this.positionY + 20, "#00d2d3", 4));
+                return; // 0 Damage
+            }
+        }
+
         // Apply Status Multipliers
         // Dr. Xeno: Shock Multiplier
         if (this.shockTimer > 0) {
