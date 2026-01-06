@@ -2857,47 +2857,6 @@ class EnemyUnit {
             else if (bossIndex === 1) enemyImg = GAME_ASSETS.BOSS_SHADOW;
             else enemyImg = GAME_ASSETS.BOSS_GOLEM;
 
-        } else if (tierId === 'AEGIS') {
-            // [Patch] Procedural Aegis Sprite (Symmetrical/South)
-            // Replaces image to ensure perfect alignment
-            context.save();
-            context.translate(this.positionX, this.positionY);
-            const sz = this.size;
-
-            // 1. Main Armor (Shield Shape)
-            context.fillStyle = "#34495e"; // Dark Metal
-            context.shadowBlur = 10; context.shadowColor = "#34495e";
-            context.beginPath();
-            context.moveTo(-sz, -sz * 0.8); // Top L
-            context.lineTo(sz, -sz * 0.8);  // Top R
-            context.lineTo(sz, sz * 0.2);   // Side R
-            context.lineTo(0, sz * 1.2);    // Bottom Tip
-            context.lineTo(-sz, sz * 0.2);  // Side L
-            context.closePath();
-            context.fill();
-            context.shadowBlur = 0;
-
-            // 2. Crystal Emitter (The Generator)
-            context.fillStyle = "#00d2d3"; // Cyan
-            context.shadowBlur = 15; context.shadowColor = "#00d2d3";
-            context.beginPath();
-            context.moveTo(0, sz * 0.5);
-            context.lineTo(sz * 0.3, sz * 0.9);
-            context.lineTo(0, sz * 1.5); // Extends out
-            context.lineTo(-sz * 0.3, sz * 0.9);
-            context.closePath();
-            context.fill();
-
-            // 3. Engine Glows (Rear)
-            context.fillStyle = "#3498db";
-            context.beginPath();
-            context.arc(-sz * 0.6, -sz * 0.8, 3, 0, Math.PI * 2);
-            context.arc(sz * 0.6, -sz * 0.8, 3, 0, Math.PI * 2);
-            context.fill();
-
-            context.restore();
-            // enemyImg stays null so we skip standard drawImage
-
         } else if (tierId === 'TANK') enemyImg = GAME_ASSETS.ENEMY_TANK;
         else if (tierId === 'ROGUE') enemyImg = GAME_ASSETS.ENEMY_ROGUE;
         else if (tierId === 'SWARM') enemyImg = GAME_ASSETS.ENEMY_SWARM;
@@ -3814,8 +3773,8 @@ function spawnEnemy() {
     if (!activeBoss && !activeAegis && engineState._aegisSpawnedCount < maxAegis) {
         const progressRatio = engineState.waveProgress / engineState.waveQuota;
 
-        // 1st Spawn: Mandatory around 15%
-        const isFirst = engineState._aegisSpawnedCount === 0 && progressRatio > 0.15;
+        // 1st Spawn: Mandatory around 35% (Mid-wave challenge)
+        const isFirst = engineState._aegisSpawnedCount === 0 && progressRatio > 0.35;
         // Subsequent: Chance (5%)
         const isRespawn = engineState._aegisSpawnedCount > 0 && Math.random() < 0.05;
 

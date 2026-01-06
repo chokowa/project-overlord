@@ -172,7 +172,7 @@ export const ENEMY_TIERS = {
     SWARM: { id: 'SWARM', name: 'Swarm', color: '#d35400', scale: 0.6, hpMod: 0.3, xpMod: 0.5, speedMod: 1.1, chance: 0.45 },
     MAGIC: { id: 'MAGIC', name: 'Magic', color: '#3498db', scale: 1.2, hpMod: 2.0, xpMod: 3.0, speedMod: 0.9, chance: 0.60 },
     RARE: { id: 'RARE', name: 'Rare', color: '#f1c40f', scale: 1.5, hpMod: 5.0, xpMod: 8.0, speedMod: 1.1, chance: 0.70 },
-    AEGIS: { id: 'AEGIS', name: 'Aegis', color: '#00d2d3', scale: 2.0, hpMod: 20.0, xpMod: 15.0, speedMod: 0.2, chance: 0.90 }, // New Barrier Enemy
+    AEGIS: { id: 'AEGIS', name: 'Aegis', color: '#00d2d3', scale: 2.4, hpMod: 20.0, xpMod: 15.0, speedMod: 0.2, chance: 0.90 }, // New Barrier Enemy
     BOSS: { id: 'BOSS', name: 'Boss', color: '#8e44ad', scale: 2.5, hpMod: 50.0, xpMod: 50.0, speedMod: 0.6, chance: 0.98 }
 };
 
