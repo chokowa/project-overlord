@@ -141,12 +141,12 @@ export const MISC_ITEMS = {
 
 export const UNIQUES = {
     VAMPIRE_FANG: {
-        id: 'vampire_fang', name: '吸血の牙', type: ARTIFACT_TYPES.AMULET,
+        id: 'vampire_fang', name: '吸血の牙', type: ARTIFACT_TYPES.GEAR,
         color: '#8e44ad', description: "攻撃命中時 HP回復 +1 (確率)",
         stats: { life_on_hit: 0.8 }
     },
     MIDAS_RING: {
-        id: 'midas_ring', name: 'ミダスの指輪', type: ARTIFACT_TYPES.RING,
+        id: 'midas_ring', name: 'ミダスの指輪', type: ARTIFACT_TYPES.PARTS,
         color: '#f1c40f', description: "Gold獲得量 +40%",
         stats: { gold_gain: 0.4 }
     },
@@ -240,22 +240,22 @@ export const GEMS = {
 
 export const ARTIFACTS = {
     RUBY_RING: {
-        id: 'ruby_ring', name: '赤の指輪', type: ARTIFACT_TYPES.RING,
+        id: 'ruby_ring', name: '赤の指輪', type: ARTIFACT_TYPES.PARTS,
         color: '#c0392b', description: "ダメージ +15%",
         stats: { damage_pct: 0.15 }
     },
     EMERALD_RING: {
-        id: 'emerald_ring', name: '緑の指輪', type: ARTIFACT_TYPES.RING,
+        id: 'emerald_ring', name: '緑の指輪', type: ARTIFACT_TYPES.PARTS,
         color: '#27ae60', description: "発射速度 +15%",
         stats: { rate_pct: 0.15 }
     },
     SAPPHIRE_AMULET: {
-        id: 'sapphire_amulet', name: '青のアミュレット', type: ARTIFACT_TYPES.AMULET,
+        id: 'sapphire_amulet', name: '青のアミュレット', type: ARTIFACT_TYPES.GEAR,
         color: '#2980b9', description: "クリティカル率 +8%",
         stats: { crit_chance: 0.08 }
     },
     GOLD_AMULET: {
-        id: 'gold_amulet', name: '黄金の首飾り', type: ARTIFACT_TYPES.AMULET,
+        id: 'gold_amulet', name: '黄金の首飾り', type: ARTIFACT_TYPES.GEAR,
         color: '#f39c12', description: "XP獲得量 +20%",
         stats: { xp_gain: 0.20 }
     },
