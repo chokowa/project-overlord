@@ -254,7 +254,9 @@ class GameEngine {
 
     addXp(amount) {
         // Wrapper for global addExperience function if it exists, or direct logic
+        console.log('[DEBUG] addXp called with amount:', amount);
         if (typeof addExperience === 'function') {
+            console.log('[DEBUG] Calling global addExperience');
             addExperience(amount);
         } else {
             this.experiencePoints += amount;
@@ -2884,6 +2886,7 @@ class EnemyUnit {
                 this.isActive = false;
 
                 // XP Gain (Using new wrapper)
+                console.log('[DEBUG] Enemy died, granting XP:', this.xpValue);
                 engineState.addXp(this.xpValue);
 
                 // Drop Generation
@@ -4604,7 +4607,9 @@ function restartGame() {
 }
 
 function addExperience(value) {
+    console.log('[DEBUG] addExperience called, value:', value, 'current XP:', engineState.experiencePoints);
     engineState.experiencePoints += value;
+    console.log('[DEBUG] New XP total:', engineState.experiencePoints);
     if (engineState.experiencePoints >= engineState.calculateNextLevelXp()) {
         engineState.experiencePoints = 0;
         engineState.currentLevel++;
