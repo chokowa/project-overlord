@@ -3009,7 +3009,6 @@ draw(context) {
 
     context.restore();
 }
-    }
 }
 
 
