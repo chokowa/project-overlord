@@ -4047,6 +4047,10 @@ function mainLoop() {
             }
             engineState.activeDrops.forEach(drop => drop.update());
 
+            // [Feature] Fuka Pay Auto-Collection
+            engineState.processAutoCollection();
+
+
             activeEnemies = activeEnemies.filter(e => e.isActive);
             activeEnemies.forEach(enemy => {
                 enemy.update();
